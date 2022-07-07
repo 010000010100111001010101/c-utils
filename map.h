@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 typedef struct list list;
+typedef struct node node;
 
 typedef enum {
     M_TYPE_BOOL,
@@ -25,7 +26,16 @@ typedef enum {
     M_TYPE_RESERVED_EMPTY
 } mtype;
 
-typedef struct node node;
+/* undergoing major change */
+typedef void (*map_generic_free)(void *);
+
+typedef struct map_item {
+    mtype type;
+    size_t size;
+    void *data;
+    const void *data_copy;
+    map_generic_free generic_free;
+} map_item;
 
 typedef struct map {
     uint32_t seed;
@@ -53,8 +63,8 @@ size_t map_get_size(const map *);
 
 mapiter *map_iter_init(const map *);
 bool map_iter_is_last(const mapiter *);
-bool map_iter_get_key(const mapiter *, mtype *, size_t *, const void **);
-bool map_iter_get_value(const mapiter *, mtype *, size_t *, const void **);
+bool map_iter_get_key(const mapiter *, map_item *);
+bool map_iter_get_value(const mapiter *, map_item *);
 bool map_iter_next(mapiter *);
 bool map_iter_prev(mapiter *);
 void map_iter_free(mapiter *);
@@ -79,10 +89,9 @@ list *map_get_list(const map *, size_t, const void *);
 map *map_get_map(const map *, size_t, const void *);
 void *map_get_generic(const map *, size_t, const void *);
 
-bool map_set_pointer(map *, mtype, size_t, const void *, mtype, size_t, void *);
-bool map_set(map *, mtype, size_t, const void *, mtype, size_t, const void *);
+bool map_set(map *, const map_item *, const map_item *);
 
-void map_pop(map *, size_t, const void *, mtype *, size_t *, void **);
+void map_pop(map *, size_t, const void *, map_item *);
 void map_remove(map *, size_t, const void *);
 void map_free(map *);
 

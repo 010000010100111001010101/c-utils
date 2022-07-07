@@ -40,66 +40,46 @@ static bool append_rows_named(sqlite3 *db, sqlite3_stmt *stmt, list *res){
                 return false;
             }
 
-            bool success;
             int ctype = sqlite3_column_type(stmt, index);
             const char *cname = sqlite3_column_name(stmt, index);
-            size_t cnamelen = strlen(cname);
+
+            map_item k = {0};
+            k.type = M_TYPE_STRING;
+            k.size = strlen(cname);
+            k.data_copy = cname;
+
+            map_item v = {0};
 
             if (ctype == SQLITE_FLOAT){
                 double value = sqlite3_column_double(stmt, index);
 
-                success = map_set(
-                    row,
-                    M_TYPE_STRING,
-                    cnamelen,
-                    cname,
-                    M_TYPE_DOUBLE,
-                    sizeof(value),
-                    &value
-                );
+                v.type = M_TYPE_DOUBLE;
+                v.size = sizeof(value);
+                v.data_copy = &value;
             }
             else if (ctype == SQLITE_INTEGER){
                 int value = sqlite3_column_int(stmt, index);
 
-                success = map_set(
-                    row,
-                    M_TYPE_STRING,
-                    cnamelen,
-                    cname,
-                    M_TYPE_INT,
-                    sizeof(value),
-                    &value
-                );
+                v.type = M_TYPE_INT;
+                v.size = sizeof(value);
+                v.data_copy = &value;
             }
             else if (ctype == SQLITE_NULL){
                 void *value = NULL;
 
-                success = map_set(
-                    row,
-                    M_TYPE_STRING,
-                    cnamelen,
-                    cname,
-                    M_TYPE_NULL,
-                    sizeof(value),
-                    value
-                );
+                v.type = M_TYPE_NULL;
+                v.size = sizeof(value);
+                v.data = value;
             }
             else {
                 const void *value = sqlite3_column_blob(stmt, index);
-                size_t valuelen = sqlite3_column_bytes(stmt, index);
 
-                success = map_set(
-                    row,
-                    M_TYPE_STRING,
-                    cnamelen,
-                    cname,
-                    M_TYPE_STRING,
-                    valuelen,
-                    value
-                );
+                v.type = M_TYPE_STRING;
+                v.size = sqlite3_column_bytes(stmt, index);
+                v.data_copy = value;
             }
 
-            if (!success){
+            if (!map_set(row, &k, &v)){
                 log_write(
                     logger,
                     LOG_ERROR,

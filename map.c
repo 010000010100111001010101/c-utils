@@ -16,17 +16,11 @@
 
 static logctx *logger = NULL;
 
-typedef struct {
-    mtype type;
-    size_t size;
-    void *data;
-} item;
-
 typedef struct node {
     uint32_t hash;
 
-    item *key;
-    item *value;
+    map_item *key;
+    map_item *value;
 
     node *prev;
     node *next;
@@ -44,8 +38,8 @@ static size_t generate_index(uint32_t seed, size_t size){
     return (LCG_MULTIPLIER * seed + LCG_INCREMENT) & (size - 1);
 }
 
-static item *item_init_pointer(mtype type, size_t size, void *data){
-    item *i = malloc(sizeof(*i));
+static map_item *item_init_pointer(mtype type, size_t size, void *data, map_generic_free generic_free){
+    map_item *i = malloc(sizeof(*i));
 
     if (!i){
         log_write(
@@ -61,12 +55,13 @@ static item *item_init_pointer(mtype type, size_t size, void *data){
     i->type = type;
     i->size = size;
     i->data = data;
+    i->generic_free = generic_free;
 
     return i;
 }
 
-static item *item_init(mtype type, size_t size, const void *data){
-    item *i = malloc(sizeof(*i));
+static map_item *item_init(mtype type, size_t size, const void *data, map_generic_free generic_free){
+    map_item *i = malloc(sizeof(*i));
 
     if (!i){
         log_write(
@@ -81,6 +76,7 @@ static item *item_init(mtype type, size_t size, const void *data){
 
     i->type = type;
     i->size = size;
+    i->generic_free = generic_free;
 
     if (type == M_TYPE_STRING){
         i->data = malloc(size + 1);
@@ -157,7 +153,7 @@ static item *item_init(mtype type, size_t size, const void *data){
     return i;
 }
 
-static void item_free(item *i){
+static void item_free(map_item *i){
     if (!i){
         log_write(
             logger,
@@ -170,6 +166,12 @@ static void item_free(item *i){
     }
 
     switch (i->type){
+    case M_TYPE_GENERIC:
+        if (i->generic_free){
+            i->generic_free(i->data);
+        }
+
+        break;
     case M_TYPE_LIST:
         list_free(i->data);
 
@@ -187,55 +189,7 @@ static void item_free(item *i){
     free(i);
 }
 
-static node *node_init_pointer(mtype kt, size_t ks, const void *k, mtype vt, size_t vs, void *v){
-    node *n = calloc(1, sizeof(*n));
-
-    if (!n){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] node_init_pointer() - node alloc failed\n",
-            __FILE__
-        );
-
-        return NULL;
-    }
-
-    n->key = item_init(kt, ks, k);
-
-    if (!n->key){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] node_init_pointer() - key initialization failed\n",
-            __FILE__
-        );
-
-        free(n);
-
-        return NULL;
-    }
-
-    n->value = item_init_pointer(vt, vs, v);
-
-    if (!n->value){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] node_init_pointer() - value initialization failed\n",
-            __FILE__
-        );
-
-        item_free(n->key);
-        free(n);
-
-        return NULL;
-    }
-
-    return n;
-}
-
-static node *node_init(mtype kt, size_t ks, const void *k, mtype vt, size_t vs, const void *v){
+static node *node_init(const map_item *key, const map_item *value){
     node *n = calloc(1, sizeof(*n));
 
     if (!n){
@@ -249,7 +203,7 @@ static node *node_init(mtype kt, size_t ks, const void *k, mtype vt, size_t vs, 
         return NULL;
     }
 
-    n->key = item_init(kt, ks, k);
+    n->key = item_init(key->type, key->size, key->data_copy, key->generic_free);
 
     if (!n->key){
         log_write(
@@ -264,7 +218,22 @@ static node *node_init(mtype kt, size_t ks, const void *k, mtype vt, size_t vs, 
         return NULL;
     }
 
-    n->value = item_init(vt, vs, v);
+    if (value->data){
+        n->value = item_init_pointer(
+            value->type,
+            value->size,
+            value->data,
+            value->generic_free
+        );
+    }
+    else {
+        n->value = item_init(
+            value->type,
+            value->size,
+            value->data_copy,
+            value->generic_free
+        );
+    }
 
     if (!n->value){
         log_write(
@@ -470,7 +439,7 @@ map *map_copy(const map *m){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] map_copy() - map alloc failed\n",
+            "[%s] map_copy() - map intiialization failed\n",
             __FILE__
         );
 
@@ -480,14 +449,14 @@ map *map_copy(const map *m){
     node *n = m->first;
 
     while (n){
-        const item *k = n->key;
-        const item *v = n->value;
+        const map_item *k = n->key;
+        const map_item *v = n->value;
 
-        if (!map_set(copy, k->type, k->size, k->data, v->type, v->size, v->data)){
+        if (!map_set(copy, k, v)){
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] map_copy() - node copy failed\n",
+                "[%s] map_copy() - map_set call failed\n",
                 __FILE__
             );
 
@@ -631,7 +600,7 @@ mapiter *map_iter_init(const map *m){
         return NULL;
     }
 
-    mapiter *iter = calloc(1, sizeof(*iter));
+    mapiter *iter = malloc(sizeof(*iter));
 
     if (!iter){
         log_write(
@@ -645,6 +614,7 @@ mapiter *map_iter_init(const map *m){
     }
 
     iter->m = m;
+    iter->n = NULL;
 
     return iter;
 }
@@ -653,7 +623,7 @@ bool map_iter_is_last(const mapiter *iter){
     if (!iter){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] map_iter_is_last() - iterator is NULL\n",
             __FILE__
         );
@@ -673,8 +643,8 @@ bool map_iter_is_last(const mapiter *iter){
     else if (!iter->n){
         log_write(
             logger,
-            LOG_ERROR,
-            "[%s] map_iter_is_last() - node is NULL\n",
+            LOG_DEBUG,
+            "[%s] map_iter_is_last() - node is NULL -- map_iter_next hasn't been called\n",
             __FILE__
         );
 
@@ -684,11 +654,11 @@ bool map_iter_is_last(const mapiter *iter){
     return iter->n == iter->m->last;
 }
 
-bool map_iter_get_key(const mapiter *iter, mtype *kt, size_t *ks, const void **k){
+bool map_iter_get_key(const mapiter *iter, map_item *key){
     if (!iter){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] map_iter_get_key() - iterator is NULL\n",
             __FILE__
         );
@@ -708,34 +678,34 @@ bool map_iter_get_key(const mapiter *iter, mtype *kt, size_t *ks, const void **k
     else if (!iter->n){
         log_write(
             logger,
-            LOG_ERROR,
-            "[%s] map_iter_get_key() - node is NULL\n",
+            LOG_DEBUG,
+            "[%s] map_iter_get_key() - node is NULL -- map_iter_next hasn't been called\n",
+            __FILE__
+        );
+
+        return false;
+    }
+    else if (!key){
+        log_write(
+            logger,
+            LOG_WARNING,
+            "[%s] map_iter_get_key() - key is NULL\n",
             __FILE__
         );
 
         return false;
     }
 
-    if (kt){
-        *kt = iter->n->key->type;
-    }
-
-    if (ks){
-        *ks = iter->n->key->size;
-    }
-
-    if (k){
-        *k = iter->n->key->data;
-    }
+    *key = *iter->n->key;
 
     return true;
 }
 
-bool map_iter_get_value(const mapiter *iter, mtype *vt, size_t *vs, const void **v){
+bool map_iter_get_value(const mapiter *iter, map_item *value){
     if (!iter){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] map_iter_get_value() - iterator is NULL\n",
             __FILE__
         );
@@ -762,18 +732,18 @@ bool map_iter_get_value(const mapiter *iter, mtype *vt, size_t *vs, const void *
 
         return false;
     }
+    else if (!value){
+        log_write(
+            logger,
+            LOG_WARNING,
+            "[%s] map_iter_get_value() - value is NULL\n",
+            __FILE__
+        );
 
-    if (vt){
-        *vt = iter->n->value->type;
+        return false;
     }
 
-    if (vs){
-        *vs = iter->n->value->size;
-    }
-
-    if (v){
-        *v = iter->n->value->data;
-    }
+    *value = *iter->n->value;
 
     return true;
 }
@@ -954,122 +924,7 @@ void *map_get_generic(const map *m, size_t size, const void *key){
     return n->value->data;
 }
 
-bool map_set_pointer(map *m, mtype kt, size_t ks, const void *k, mtype vt, size_t vs, void *v){
-    if (!m){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] map_set_pointer() - map is NULL\n",
-            __FILE__
-        );
-
-        return false;
-    }
-    else if (!k){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] map_set_pointer() - key is NULL\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
-    double load = (double)m->length / (double)m->size;
-
-    if (load >= MAP_GROWTH_LOAD_FACTOR){
-        size_t newsize = m->size << 1;
-
-        if (newsize <= m->size){
-            log_write(
-                logger,
-                LOG_ERROR,
-                "[%s] map_set_pointer() - newsize <= m->size\n",
-                __FILE__
-            );
-
-            return false;
-        }
-
-        if (!map_resize(m, newsize)){
-            log_write(
-                logger,
-                LOG_ERROR,
-                "[%s] map_set_pointer() - failed to resize map\n",
-                __FILE__
-            );
-
-            return false;
-        }
-    }
-
-    uint32_t hash = generate_hash(m->seed, ks, k);
-    size_t index = generate_index(hash, m->size);
-    node *n = m->nodes[index];
-
-    for (size_t count = 0; count < m->size; ++count){
-        if (!n){
-            break;
-        }
-
-        if (hash == n->hash && !memcmp(k, n->key->data, n->key->size)){
-            item *newvalue = item_init(vt, vs, v);
-
-            if (!newvalue){
-                log_write(
-                    logger,
-                    LOG_ERROR,
-                    "[%s] map_set() - replacement value initialization failed\n",
-                    __FILE__
-                );
-
-                return false;
-            }
-
-            item_free(n->value);
-
-            n->value = newvalue;
-
-            return true;
-        }
-
-        index = generate_index(index, m->size);
-        n = m->nodes[index];
-    }
-
-    n = node_init_pointer(kt, ks, k, vt, vs, v);
-
-    if (!n){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] map_set() - node initialization failed\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
-    n->hash = hash;
-    m->nodes[index] = n;
-
-    ++m->length;
-
-    if (m->first){
-        n->prev = m->last;
-        m->last->next = n;
-        m->last = n;
-    }
-    else {
-        m->first = n;
-        m->last = n;
-    }
-
-    return true;
-}
-
-bool map_set(map *m, mtype kt, size_t ks, const void *k, mtype vt, size_t vs, const void *v){
+bool map_set(map *m, const map_item *key, const map_item *value){
     if (!m){
         log_write(
             logger,
@@ -1080,11 +935,21 @@ bool map_set(map *m, mtype kt, size_t ks, const void *k, mtype vt, size_t vs, co
 
         return false;
     }
-    else if (!k){
+    else if (!key){
         log_write(
             logger,
             LOG_ERROR,
             "[%s] map_set() - key is NULL\n",
+            __FILE__
+        );
+
+        return false;
+    }
+    else if (key->data){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] map_set() - key will always be copied -- set key->data_copy instead\n",
             __FILE__
         );
 
@@ -1119,7 +984,7 @@ bool map_set(map *m, mtype kt, size_t ks, const void *k, mtype vt, size_t vs, co
         }
     }
 
-    uint32_t hash = generate_hash(m->seed, ks, k);
+    uint32_t hash = generate_hash(m->seed, key->size, key->data_copy);
     size_t index = generate_index(hash, m->size);
     node *n = m->nodes[index];
 
@@ -1128,10 +993,27 @@ bool map_set(map *m, mtype kt, size_t ks, const void *k, mtype vt, size_t vs, co
             break;
         }
 
-        if (hash == n->hash && !memcmp(k, n->key->data, n->key->size)){
-            item *newvalue = item_init(vt, vs, v);
+        if (hash == n->hash && !memcmp(key->data_copy, n->key->data, n->key->size)){
+            map_item *tmp = NULL;
 
-            if (!newvalue){
+            if (value->data){
+                tmp = item_init_pointer(
+                    value->type,
+                    value->size,
+                    value->data,
+                    value->generic_free
+                );
+            }
+            else {
+                tmp = item_init(
+                    value->type,
+                    value->size,
+                    value->data_copy,
+                    value->generic_free
+                );
+            }
+
+            if (!tmp){
                 log_write(
                     logger,
                     LOG_ERROR,
@@ -1144,7 +1026,7 @@ bool map_set(map *m, mtype kt, size_t ks, const void *k, mtype vt, size_t vs, co
 
             item_free(n->value);
 
-            n->value = newvalue;
+            n->value = tmp;
 
             return true;
         }
@@ -1153,7 +1035,18 @@ bool map_set(map *m, mtype kt, size_t ks, const void *k, mtype vt, size_t vs, co
         n = m->nodes[index];
     }
 
-    n = node_init(kt, ks, k, vt, vs, v);
+    if (n){
+        log_write(
+            logger,
+            LOG_WARNING,
+            "[%s] map_set() - node is *not* NULL after loop --- THIS IS A BUG! ---\n",
+            __FILE__
+        );
+
+        return false;
+    }
+
+    n = node_init(key, value);
 
     if (!n){
         log_write(
@@ -1184,25 +1077,32 @@ bool map_set(map *m, mtype kt, size_t ks, const void *k, mtype vt, size_t vs, co
     return true;
 }
 
-void map_pop(map *m, size_t size, const void *key, mtype *vt, size_t *vs, void **v){
+void map_pop(map *m, size_t size, const void *key, map_item *value){
     node *n = get_node(m, size, key, M_TYPE_RESERVED_EMPTY);
 
-    if (vt){
-        *vt = n ? n->value->type : M_TYPE_RESERVED_ERROR;
+    if (!n){
+        return;
     }
 
-    if (vs){
-        *vs = n ? n->value->size : 0;
-    }
+    if (value){
+        value->type = n->value->type;
+        value->size = n->value->size;
+        value->data = n->value->data;
+        value->generic_free = n->value->generic_free;
 
-    if (v){
-        *v = n ? n->value->data : NULL;
-
-        if (v){
+        if (value->data){
             n->value->type = M_TYPE_NULL;
             n->value->size = 0;
             n->value->data = NULL;
         }
+    }
+    else {
+        log_write(
+            logger,
+            LOG_DEBUG,
+            "[%s] map_pop() - value is NULL -- removing pair anyway\n",
+            __FILE__
+        );
     }
 
     map_remove(m, size, key);

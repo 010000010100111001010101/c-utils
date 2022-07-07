@@ -23,57 +23,65 @@ static bool add_json_array_value_to_map(map *m, const char *key, json_object *va
         return false;
     }
 
-    return map_set_pointer(
-        m,
-        M_TYPE_STRING,
-        strlen(key),
-        key,
-        M_TYPE_LIST,
-        sizeof(*tmp),
-        tmp
-    );
+    map_item k = {0};
+    k.type = M_TYPE_STRING;
+    k.size = strlen(key);
+    k.data_copy = key;
+
+    map_item v = {0};
+    v.type = M_TYPE_LIST;
+    v.size = sizeof(*tmp);
+    v.data = tmp;
+
+    return map_set(m, &k, &v);
 }
 
 static bool add_json_bool_value_to_map(map *m, const char *key, json_object *value){
     bool tmp = json_object_get_boolean(value);
 
-    return map_set(
-        m,
-        M_TYPE_STRING,
-        strlen(key),
-        key,
-        M_TYPE_BOOL,
-        sizeof(tmp),
-        &tmp
-    );
+    map_item k = {0};
+    k.type = M_TYPE_STRING;
+    k.size = strlen(key);
+    k.data_copy = key;
+
+    map_item v = {0};
+    v.type = M_TYPE_BOOL;
+    v.size = sizeof(tmp);
+    v.data_copy = &tmp;
+
+    return map_set(m, &k, &v);
 }
 
 static bool add_json_double_value_to_map(map *m, const char *key, json_object *value){
     double tmp = json_object_get_double(value);
 
-    return map_set(
-        m,
-        M_TYPE_STRING,
-        strlen(key),
-        key,
-        M_TYPE_DOUBLE,
-        sizeof(tmp),
-        &tmp
-    );
+    map_item k = {0};
+    k.type = M_TYPE_STRING;
+    k.size = strlen(key);
+    k.data_copy = key;
+
+    map_item v = {0};
+    v.type = M_TYPE_DOUBLE;
+    v.size = sizeof(tmp);
+    v.data_copy = &tmp;
+
+    return map_set(m, &k, &v);
 }
 
 static bool add_json_int_value_to_map(map *m, const char *key, json_object *value){
     int64_t tmp = json_object_get_int64(value);
 
-    return map_set(
-        m,
-        M_TYPE_STRING,
-        strlen(key),
-        key,
-        M_TYPE_INT,
-        sizeof(tmp),
-        &tmp
-    );
+    map_item k = {0};
+    k.type = M_TYPE_STRING;
+    k.size = strlen(key);
+    k.data_copy = key;
+
+    map_item v = {0};
+    v.type = M_TYPE_INT;
+    v.size = sizeof(tmp);
+    v.data_copy = &tmp;
+
+    return map_set(m, &k, &v);
 }
 
 static bool add_json_object_value_to_map(map *m, const char *key, json_object *value){
@@ -90,30 +98,34 @@ static bool add_json_object_value_to_map(map *m, const char *key, json_object *v
         return false;
     }
 
-    return map_set_pointer(
-        m,
-        M_TYPE_STRING,
-        strlen(key),
-        key,
-        M_TYPE_MAP,
-        sizeof(*tmp),
-        tmp
-    );
+    map_item k = {0};
+    k.type = M_TYPE_STRING;
+    k.size = strlen(key);
+    k.data_copy = key;
+
+    map_item v = {0};
+    v.type = M_TYPE_MAP;
+    v.size = sizeof(*tmp);
+    v.data = tmp;
+
+    return map_set(m, &k, &v);
 }
 
 static bool add_json_string_value_to_map(map *m, const char *key, json_object *value){
     size_t tmplen = json_object_get_string_len(value);
     const char *tmp = json_object_get_string(value);
 
-    return map_set(
-        m,
-        M_TYPE_STRING,
-        strlen(key),
-        key,
-        M_TYPE_STRING,
-        tmplen,
-        tmp
-    );
+    map_item k = {0};
+    k.type = M_TYPE_STRING;
+    k.size = strlen(key);
+    k.data_copy = key;
+
+    map_item v = {0};
+    v.type = M_TYPE_STRING;
+    v.size = tmplen;
+    v.data_copy = tmp;
+
+    return map_set(m, &k, &v);
 }
 
 list *json_array_to_list(json_object *value){

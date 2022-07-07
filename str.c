@@ -6,7 +6,6 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
 
 static logctx *logger = NULL;
@@ -276,7 +275,7 @@ char *string_join(const list *input, const char *delim){
             outputlen += delimlen;
         }
 
-        outputlen += list_get_node_size(input, index);
+        outputlen += list_get_item_size(input, index);
     }
 
     char *output = malloc(outputlen + 1);
@@ -296,7 +295,7 @@ char *string_join(const list *input, const char *delim){
 
     for (size_t index = 0; index < inputlen; ++index){
         const char *ostr = list_get_string(input, index);
-        size_t ostrlen = list_get_node_size(input, index);
+        size_t ostrlen = list_get_item_size(input, index);
 
         memcpy(&output[currlen], ostr, ostrlen);
 
@@ -312,41 +311,6 @@ char *string_join(const list *input, const char *delim){
     output[currlen] = '\0';
 
     return output;
-}
-
-bool string_to_int(const char *input, int *output, int base){
-    if (!input){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] string_to_int() - input is NULL\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
-    char *end;
-
-    errno = 0;
-    int value = strtol(input, &end, base);
-
-    if (errno == ERANGE || (*end != '\0' || *input == '\0')){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] string_to_int() - %s conversion to base %d failed\n",
-            __FILE__,
-            input,
-            base
-        );
-
-        return false;
-    }
-
-    *output = value;
-
-    return true;
 }
 
 char *string_lower(char *input){
@@ -416,6 +380,41 @@ bool string_from_time(const char *format, char *output, size_t outputsize){
 
         return false;
     }
+
+    return true;
+}
+
+bool string_to_int(const char *input, int *output, int base){
+    if (!input){
+        log_write(
+            logger,
+            LOG_WARNING,
+            "[%s] string_to_int() - input is NULL\n",
+            __FILE__
+        );
+
+        return false;
+    }
+
+    char *end;
+
+    errno = 0;
+    int value = strtol(input, &end, base);
+
+    if (errno == ERANGE || (*end != '\0' || *input == '\0')){
+        log_write(
+            logger,
+            LOG_WARNING,
+            "[%s] string_to_int() - %s conversion to base %d failed\n",
+            __FILE__,
+            input,
+            base
+        );
+
+        return false;
+    }
+
+    *output = value;
 
     return true;
 }
