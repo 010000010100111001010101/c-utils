@@ -66,15 +66,24 @@ char map_get_char(const map *, size_t, const void *);
 double map_get_double(const map *, size_t, const void *);
 int64_t map_get_int(const map *, size_t, const void *);
 size_t map_get_size_t(const map *, size_t, const void *);
-const char *map_get_string(const map *, size_t, const void *);
-const list *map_get_list(const map *, size_t, const void *);
-const map *map_get_map(const map *, size_t, const void *);
-const void *map_get_generic(const map *, size_t, const void *);
+
+/* ------------------ WARNING ------------------
+ * the data at these pointers can be modified but
+ * the pointer MUST NOT be free'd! the size of the
+ * allocated memory stays the same as well. this
+ * is so the data can be changed (like modifying
+ * a map inside of a map)
+ */
+char *map_get_string(const map *, size_t, const void *);
+list *map_get_list(const map *, size_t, const void *);
+map *map_get_map(const map *, size_t, const void *);
+void *map_get_generic(const map *, size_t, const void *);
 
 bool map_set_pointer(map *, mtype, size_t, const void *, mtype, size_t, void *);
 bool map_set(map *, mtype, size_t, const void *, mtype, size_t, const void *);
 
-bool map_remove(map *, size_t, const void *);
+void map_pop(map *, size_t, const void *, mtype *, size_t *, void **);
+void map_remove(map *, size_t, const void *);
 void map_free(map *);
 
 #endif

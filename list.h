@@ -39,7 +39,7 @@ bool list_resize(list *, size_t);
 
 size_t list_get_length(const list *);
 size_t list_get_size(const list *);
-size_t list_get_node_size(const list *, size_t);
+size_t list_get_item_size(const list *, size_t);
 /* const char *list_to_string(const list *); */
 
 bool list_contains(const list *, size_t, const void *);
@@ -49,10 +49,18 @@ char list_get_char(const list *, size_t);
 double list_get_double(const list *, size_t);
 int64_t list_get_int(const list *, size_t);
 size_t list_get_size_t(const list *, size_t);
-const char *list_get_string(const list *, size_t);
-const list *list_get_list(const list *, size_t);
-const map *list_get_map(const list *, size_t);
-const void *list_get_generic(const list *, size_t);
+
+/* ------------------ WARNING ------------------
+ * the data at these pointers can be modified but
+ * the pointer MUST NOT be free'd! the size of the
+ * allocated memory stays the same as well. this
+ * is so the data can be changed (like modifying
+ * a list inside of a list)
+ */
+char *list_get_string(const list *, size_t);
+list *list_get_list(const list *, size_t);
+map *list_get_map(const list *, size_t);
+void *list_get_generic(const list *, size_t);
 
 bool list_replace_pointer(list *, size_t, ltype, size_t, void *);
 bool list_replace(list *, size_t, ltype, size_t, const void *);
@@ -61,7 +69,7 @@ bool list_insert(list *, size_t, ltype, size_t, const void *);
 bool list_append_pointer(list *, ltype, size_t, void *);
 bool list_append(list *, ltype, size_t, const void *);
 
-bool list_pop(list *, size_t, ltype *, size_t *, void **);
+void list_pop(list *, size_t, ltype *, size_t *, void **);
 void list_remove(list *, size_t);
 void list_empty(list *);
 void list_free(list *);

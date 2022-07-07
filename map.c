@@ -1,12 +1,12 @@
 #include "map.h"
 
 #include "log.h"
+#include "str.h"
 
 #include "hashers/spooky.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #define MAP_MINIMUM_SIZE 8
 #define MAP_GROWTH_LOAD_FACTOR 0.8
@@ -17,9 +17,9 @@
 static logctx *logger = NULL;
 
 typedef struct {
-    void *data;
-    size_t size;
     mtype type;
+    size_t size;
+    void *data;
 } item;
 
 typedef struct node {
@@ -58,15 +58,15 @@ static item *item_init_pointer(mtype type, size_t size, void *data){
         return NULL;
     }
 
-    i->data = data;
-    i->size = size;
     i->type = type;
+    i->size = size;
+    i->data = data;
 
     return i;
 }
 
 static item *item_init(mtype type, size_t size, const void *data){
-    item *i = calloc(1, sizeof(*i));
+    item *i = malloc(sizeof(*i));
 
     if (!i){
         log_write(
@@ -78,6 +78,9 @@ static item *item_init(mtype type, size_t size, const void *data){
 
         return NULL;
     }
+
+    i->type = type;
+    i->size = size;
 
     if (type == M_TYPE_STRING){
         i->data = malloc(size + 1);
@@ -95,10 +98,7 @@ static item *item_init(mtype type, size_t size, const void *data){
             return NULL;
         }
 
-        memcpy(i->data, data, size);
-
-        char *datastr = i->data;
-        datastr[size] = '\0';
+        string_copy(data, i->data, size);
     }
     else if (type == M_TYPE_LIST){
         i->data = list_copy(data);
@@ -154,9 +154,6 @@ static item *item_init(mtype type, size_t size, const void *data){
         memcpy(i->data, data, size);
     }
 
-    i->size = size;
-    i->type = type;
-
     return i;
 }
 
@@ -164,7 +161,7 @@ static void item_free(item *i){
     if (!i){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] item_free() - item is NULL\n",
             __FILE__
         );
@@ -235,9 +232,6 @@ static node *node_init_pointer(mtype kt, size_t ks, const void *k, mtype vt, siz
         return NULL;
     }
 
-    n->prev = NULL;
-    n->next = NULL;
-
     return n;
 }
 
@@ -286,9 +280,6 @@ static node *node_init(mtype kt, size_t ks, const void *k, mtype vt, size_t vs, 
         return NULL;
     }
 
-    n->prev = NULL;
-    n->next = NULL;
-
     return n;
 }
 
@@ -296,7 +287,7 @@ static void node_free(node *n){
     if (!n){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] node_free() - node is NULL\n",
             __FILE__
         );
@@ -314,8 +305,18 @@ static bool get_node_index(const map *m, size_t *ret, size_t size, const void *k
     if (!m){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] get_node_index() - map is NULL\n",
+            __FILE__
+        );
+
+        return false;
+    }
+    else if (!key){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] get_node_index() - key is NULL\n",
             __FILE__
         );
 
@@ -359,8 +360,18 @@ static node *get_node(const map *m, size_t size, const void *key, mtype type){
     if (!m){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] get_node() - map is NULL\n",
+            __FILE__
+        );
+
+        return NULL;
+    }
+    else if (!key){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] get_node() - key is NULL\n",
             __FILE__
         );
 
@@ -386,7 +397,7 @@ static node *get_node(const map *m, size_t size, const void *key, mtype type){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] get_node() - node is NULL after get_node_index --- THIS IS A BUG! FIX IMMEDIATELY! ---\n",
+            "[%s] get_node() - node is NULL after get_node_index --- THIS IS A BUG! ---\n",
             __FILE__
         );
     }
@@ -403,7 +414,7 @@ static node *get_node(const map *m, size_t size, const void *key, mtype type){
 }
 
 map *map_init(void){
-    map *m = malloc(sizeof(*m));
+    map *m = calloc(1, sizeof(*m));
 
     if (!m){
         log_write(
@@ -620,7 +631,7 @@ mapiter *map_iter_init(const map *m){
         return NULL;
     }
 
-    mapiter *iter = malloc(sizeof(*iter));
+    mapiter *iter = calloc(1, sizeof(*iter));
 
     if (!iter){
         log_write(
@@ -634,7 +645,6 @@ mapiter *map_iter_init(const map *m){
     }
 
     iter->m = m;
-    iter->n = NULL;
 
     return iter;
 }
@@ -706,9 +716,17 @@ bool map_iter_get_key(const mapiter *iter, mtype *kt, size_t *ks, const void **k
         return false;
     }
 
-    *kt = iter->n->key->type;
-    *ks = iter->n->key->size;
-    *k = iter->n->key->data;
+    if (kt){
+        *kt = iter->n->key->type;
+    }
+
+    if (ks){
+        *ks = iter->n->key->size;
+    }
+
+    if (k){
+        *k = iter->n->key->data;
+    }
 
     return true;
 }
@@ -745,9 +763,17 @@ bool map_iter_get_value(const mapiter *iter, mtype *vt, size_t *vs, const void *
         return false;
     }
 
-    *vt = iter->n->value->type;
-    *vs = iter->n->value->size;
-    *v = iter->n->value->data;
+    if (vt){
+        *vt = iter->n->value->type;
+    }
+
+    if (vs){
+        *vs = iter->n->value->size;
+    }
+
+    if (v){
+        *v = iter->n->value->data;
+    }
 
     return true;
 }
@@ -822,32 +848,10 @@ void map_iter_free(mapiter *iter){
 }
 
 bool map_contains(const map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_contains() - map is NULL\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
     return get_node(m, size, key, M_TYPE_RESERVED_EMPTY);
 }
 
 mtype map_get_type(const map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_get_type() - map is NULL\n",
-            __FILE__
-        );
-
-        return M_TYPE_RESERVED_ERROR;
-    }
-
     const node *n = get_node(m, size, key, M_TYPE_RESERVED_EMPTY);
 
     if (!n){
@@ -858,17 +862,6 @@ mtype map_get_type(const map *m, size_t size, const void *key){
 }
 
 bool map_get_bool(const map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_get_bool() - map is NULL\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
     const node *n = get_node(m, size, key, M_TYPE_BOOL);
 
     if (!n){
@@ -879,17 +872,6 @@ bool map_get_bool(const map *m, size_t size, const void *key){
 }
 
 char map_get_char(const map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_get_char() - map is NULL\n",
-            __FILE__
-        );
-
-        return 0;
-    }
-
     const node *n = get_node(m, size, key, M_TYPE_CHAR);
 
     if (!n){
@@ -900,17 +882,6 @@ char map_get_char(const map *m, size_t size, const void *key){
 }
 
 double map_get_double(const map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_get_double() - map is NULL\n",
-            __FILE__
-        );
-
-        return 0.0;
-    }
-
     const node *n = get_node(m, size, key, M_TYPE_DOUBLE);
 
     if (!n){
@@ -921,17 +892,6 @@ double map_get_double(const map *m, size_t size, const void *key){
 }
 
 int64_t map_get_int(const map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_get_int() - map is NULL\n",
-            __FILE__
-        );
-
-        return -1;
-    }
-
     const node *n = get_node(m, size, key, M_TYPE_INT);
 
     if (!n){
@@ -942,17 +902,6 @@ int64_t map_get_int(const map *m, size_t size, const void *key){
 }
 
 size_t map_get_size_t(const map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_get_size_t() - map is NULL\n",
-            __FILE__
-        );
-
-        return 0;
-    }
-
     const node *n = get_node(m, size, key, M_TYPE_SIZE_T);
 
     if (!n){
@@ -962,18 +911,10 @@ size_t map_get_size_t(const map *m, size_t size, const void *key){
     return *(size_t *)n->value->data;
 }
 
-const char *map_get_string(const map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_get_string() - map is NULL\n",
-            __FILE__
-        );
-
-        return NULL;
-    }
-
+/*
+ * READ WARNING FOR THESE FUNCTIONS IN HEADER FILE
+ */
+char *map_get_string(const map *m, size_t size, const void *key){
     const node *n = get_node(m, size, key, M_TYPE_STRING);
 
     if (!n){
@@ -983,18 +924,7 @@ const char *map_get_string(const map *m, size_t size, const void *key){
     return n->value->data;
 }
 
-const list *map_get_list(const map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_get_list() - map is NULL\n",
-            __FILE__
-        );
-
-        return NULL;
-    }
-
+list *map_get_list(const map *m, size_t size, const void *key){
     const node *n = get_node(m, size, key, M_TYPE_LIST);
 
     if (!n){
@@ -1004,18 +934,7 @@ const list *map_get_list(const map *m, size_t size, const void *key){
     return n->value->data;
 }
 
-const map *map_get_map(const map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_get_map() - map is NULL\n",
-            __FILE__
-        );
-
-        return NULL;
-    }
-
+map *map_get_map(const map *m, size_t size, const void *key){
     const node *n = get_node(m, size, key, M_TYPE_MAP);
 
     if (!n){
@@ -1025,18 +944,7 @@ const map *map_get_map(const map *m, size_t size, const void *key){
     return n->value->data;
 }
 
-const void *map_get_generic(const map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_get_pointer() - map is NULL\n",
-            __FILE__
-        );
-
-        return NULL;
-    }
-
+void *map_get_generic(const map *m, size_t size, const void *key){
     const node *n = get_node(m, size, key, M_TYPE_GENERIC);
 
     if (!n){
@@ -1050,18 +958,18 @@ bool map_set_pointer(map *m, mtype kt, size_t ks, const void *k, mtype vt, size_
     if (!m){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] map_set_pointer() - map is NULL\n",
             __FILE__
         );
 
         return false;
     }
-    else if (kt == M_TYPE_NULL || !k){
+    else if (!k){
         log_write(
             logger,
-            LOG_WARNING,
-            "[%s] map_set_pointer() - key cannot be NULL\n",
+            LOG_ERROR,
+            "[%s] map_set_pointer() - key is NULL\n",
             __FILE__
         );
 
@@ -1165,18 +1073,18 @@ bool map_set(map *m, mtype kt, size_t ks, const void *k, mtype vt, size_t vs, co
     if (!m){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] map_set() - map is NULL\n",
             __FILE__
         );
 
         return false;
     }
-    else if (kt == M_TYPE_NULL || !k){
+    else if (!k){
         log_write(
             logger,
-            LOG_WARNING,
-            "[%s] map_set() - key cannot be NULL\n",
+            LOG_ERROR,
+            "[%s] map_set() - key is NULL\n",
             __FILE__
         );
 
@@ -1276,28 +1184,31 @@ bool map_set(map *m, mtype kt, size_t ks, const void *k, mtype vt, size_t vs, co
     return true;
 }
 
-bool map_remove(map *m, size_t size, const void *key){
-    if (!m){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_remove() - map is NULL\n",
-            __FILE__
-        );
+void map_pop(map *m, size_t size, const void *key, mtype *vt, size_t *vs, void **v){
+    node *n = get_node(m, size, key, M_TYPE_RESERVED_EMPTY);
 
-        return false;
-    }
-    else if (!key){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_remove() - key cannot be NULL\n",
-            __FILE__
-        );
-
-        return false;
+    if (vt){
+        *vt = n ? n->value->type : M_TYPE_RESERVED_ERROR;
     }
 
+    if (vs){
+        *vs = n ? n->value->size : 0;
+    }
+
+    if (v){
+        *v = n ? n->value->data : NULL;
+
+        if (v){
+            n->value->type = M_TYPE_NULL;
+            n->value->size = 0;
+            n->value->data = NULL;
+        }
+    }
+
+    map_remove(m, size, key);
+}
+
+void map_remove(map *m, size_t size, const void *key){
     size_t index;
 
     if (!get_node_index(m, &index, size, key)){
@@ -1308,7 +1219,7 @@ bool map_remove(map *m, size_t size, const void *key){
             __FILE__
         );
 
-        return NULL;
+        return;
     }
 
     node *n = m->nodes[index];
@@ -1321,7 +1232,7 @@ bool map_remove(map *m, size_t size, const void *key){
             __FILE__
         );
 
-        return false;
+        return;
     }
     else if (n == m->first){
         m->first = n->next;
@@ -1343,8 +1254,6 @@ bool map_remove(map *m, size_t size, const void *key){
     m->nodes[index] = NULL;
 
     --m->length;
-
-    return true;
 }
 
 void map_free(map *m){

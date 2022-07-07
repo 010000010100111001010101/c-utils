@@ -1,10 +1,10 @@
 #include "list.h"
 
 #include "log.h"
+#include "str.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #define LIST_MINIMUM_SIZE 8
 
@@ -15,9 +15,9 @@
 #define LIST_SHRINK_FACTOR 0.5
 
 typedef struct node {
-    void *data;
-    size_t size;
     ltype type;
+    size_t size;
+    void *data;
 } node;
 
 static logctx *logger = NULL;
@@ -27,7 +27,7 @@ static size_t calculate_new_size(size_t s){
 }
 
 static node *node_init_pointer(ltype type, size_t size, void *data){
-    node *n = calloc(1, sizeof(*n));
+    node *n = malloc(sizeof(*n));
 
     if (!n){
         log_write(
@@ -40,15 +40,15 @@ static node *node_init_pointer(ltype type, size_t size, void *data){
         return NULL;
     }
 
-    n->data = data;
-    n->size = size;
     n->type = type;
+    n->size = size;
+    n->data = data;
 
     return n;
 }
 
 static node *node_init(ltype type, size_t size, const void *data){
-    node *n = calloc(1, sizeof(*n));
+    node *n = malloc(sizeof(*n));
 
     if (!n){
         log_write(
@@ -60,6 +60,9 @@ static node *node_init(ltype type, size_t size, const void *data){
 
         return NULL;
     }
+
+    n->type = type;
+    n->size = size;
 
     if (type == L_TYPE_LIST){
         n->data = list_copy(data);
@@ -112,10 +115,7 @@ static node *node_init(ltype type, size_t size, const void *data){
             return NULL;
         }
 
-        memcpy(n->data, data, size);
-
-        char *datastr = n->data;
-        datastr[size] = '\0';
+        string_copy(data, n->data, size);
     }
     else {
         n->data = malloc(size);
@@ -136,9 +136,6 @@ static node *node_init(ltype type, size_t size, const void *data){
         memcpy(n->data, data, size);
     }
 
-    n->size = size;
-    n->type = type;
-
     return n;
 }
 
@@ -146,7 +143,7 @@ static void node_free(node *n){
     if (!n){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] node_free() - node is NULL\n",
             __FILE__
         );
@@ -299,7 +296,7 @@ bool list_resize(list *l, size_t size){
     if (!l){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] list_resize() - list is NULL\n",
             __FILE__
         );
@@ -320,8 +317,9 @@ bool list_resize(list *l, size_t size){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] list_resize() - size cannot be less than LIST_MINIMUM_SIZE\n",
-            __FILE__
+            "[%s] list_resize() - size cannot be less than LIST_MINIMUM_SIZE (%d)\n",
+            __FILE__,
+            LIST_MINIMUM_SIZE
         );
 
         return false;
@@ -384,19 +382,12 @@ size_t list_get_size(const list *l){
     return l->size;
 }
 
-size_t list_get_node_size(const list *l, size_t pos){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_get_node_size() - list is NULL\n",
-            __FILE__
-        );
+size_t list_get_item_size(const list *l, size_t pos){
+    const node *n = get_node(l, pos, L_TYPE_RESERVED_EMPTY);
 
+    if (!n){
         return 0;
     }
-
-    const node *n = get_node(l, pos, L_TYPE_RESERVED_EMPTY);
 
     return n->size;
 }
@@ -425,17 +416,6 @@ bool list_contains(const list *l, size_t size, const void *data){
 }
 
 ltype list_get_type(const list *l, size_t pos){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_get_type() - list is NULL\n",
-            __FILE__
-        );
-
-        return L_TYPE_RESERVED_ERROR;
-    }
-
     const node *n = get_node(l, pos, L_TYPE_RESERVED_EMPTY);
 
     if (!n){
@@ -446,17 +426,6 @@ ltype list_get_type(const list *l, size_t pos){
 }
 
 bool list_get_bool(const list *l, size_t pos){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_get_bool() - list is NULL\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
     const node *n = get_node(l, pos, L_TYPE_BOOL);
 
     if (!n){
@@ -467,17 +436,6 @@ bool list_get_bool(const list *l, size_t pos){
 }
 
 char list_get_char(const list *l, size_t pos){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_get_char() - list is NULL\n",
-            __FILE__
-        );
-
-        return 0;
-    }
-
     const node *n = get_node(l, pos, L_TYPE_CHAR);
 
     if (!n){
@@ -488,17 +446,6 @@ char list_get_char(const list *l, size_t pos){
 }
 
 double list_get_double(const list *l, size_t pos){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_get_double() - list is NULL\n",
-            __FILE__
-        );
-
-        return 0.0;
-    }
-
     const node *n = get_node(l, pos, L_TYPE_DOUBLE);
 
     if (!n){
@@ -509,17 +456,6 @@ double list_get_double(const list *l, size_t pos){
 }
 
 int64_t list_get_int(const list *l, size_t pos){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_get_int() - list is NULL\n",
-            __FILE__
-        );
-
-        return 0;
-    }
-
     const node *n = get_node(l, pos, L_TYPE_INT);
 
     if (!n){
@@ -530,17 +466,6 @@ int64_t list_get_int(const list *l, size_t pos){
 }
 
 size_t list_get_size_t(const list *l, size_t pos){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_get_size_t() - list is NULL\n",
-            __FILE__
-        );
-
-        return 0;
-    }
-
     const node *n = get_node(l, pos, L_TYPE_SIZE_T);
 
     if (!n){
@@ -551,20 +476,9 @@ size_t list_get_size_t(const list *l, size_t pos){
 }
 
 /*
- * make this coerce other types to string?
+ * READ WARNING FOR THESE FUNCTIONS IN HEADER FILE
  */
-const char *list_get_string(const list *l, size_t pos){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_get_string() - list is NULL\n",
-            __FILE__
-        );
-
-        return NULL;
-    }
-
+char *list_get_string(const list *l, size_t pos){
     const node *n = get_node(l, pos, L_TYPE_STRING);
 
     if (!n){
@@ -574,18 +488,7 @@ const char *list_get_string(const list *l, size_t pos){
     return n->data;
 }
 
-const list *list_get_list(const list *l, size_t pos){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_get_list() - list is NULL\n",
-            __FILE__
-        );
-
-        return NULL;
-    }
-
+list *list_get_list(const list *l, size_t pos){
     const node *n = get_node(l, pos, L_TYPE_LIST);
 
     if (!n){
@@ -595,18 +498,7 @@ const list *list_get_list(const list *l, size_t pos){
     return n->data;
 }
 
-const map *list_get_map(const list *l, size_t pos){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_get_map() - list is NULL\n",
-            __FILE__
-        );
-
-        return NULL;
-    }
-
+map *list_get_map(const list *l, size_t pos){
     const node *n = get_node(l, pos, L_TYPE_MAP);
 
     if (!n){
@@ -616,18 +508,7 @@ const map *list_get_map(const list *l, size_t pos){
     return n->data;
 }
 
-const void *list_get_generic(const list *l, size_t pos){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_get_pointer() - list is NULL\n",
-            __FILE__
-        );
-
-        return NULL;
-    }
-
+void *list_get_generic(const list *l, size_t pos){
     const node *n = get_node(l, pos, L_TYPE_GENERIC);
 
     if (!n){
@@ -919,34 +800,19 @@ bool list_append(list *l, ltype type, size_t size, const void *data){
     return true;
 }
 
-bool list_pop(list *l, size_t pos, ltype *type, size_t *size, void **data){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_pop() - list is NULL\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
+void list_pop(list *l, size_t pos, ltype *type, size_t *size, void **data){
     node *n = get_node(l, pos, L_TYPE_RESERVED_EMPTY);
 
-    if (!n){
-        return false;
-    }
-
     if (type){
-        *type = n->type;
+        *type = n ? n->type : L_TYPE_RESERVED_ERROR;
     }
 
     if (size){
-        *size = n->size;
+        *size = n ? n->size : 0;
     }
 
     if (data){
-        *data = n->data;
+        *data = n ? n->data : NULL;
 
         n->type = L_TYPE_NULL;
         n->size = 0;
@@ -954,8 +820,6 @@ bool list_pop(list *l, size_t pos, ltype *type, size_t *size, void **data){
     }
 
     list_remove(l, pos);
-
-    return true;
 }
 
 void list_remove(list *l, size_t pos){
