@@ -26,7 +26,6 @@ typedef enum {
     M_TYPE_RESERVED_EMPTY
 } mtype;
 
-/* undergoing major change */
 typedef void (*map_generic_free)(void *);
 
 typedef struct map_item {

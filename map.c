@@ -170,6 +170,9 @@ static void item_free(map_item *i){
         if (i->generic_free){
             i->generic_free(i->data);
         }
+        else {
+            free(i->data);
+        }
 
         break;
     case M_TYPE_LIST:
