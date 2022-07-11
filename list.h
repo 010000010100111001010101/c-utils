@@ -25,10 +25,18 @@ typedef enum {
     L_TYPE_RESERVED_EMPTY
 } ltype;
 
-typedef struct node node;
+typedef void (*list_generic_free)(void *);
+
+typedef struct list_item {
+    ltype type;
+    size_t size;
+    void *data;
+    const void *data_copy;
+    list_generic_free generic_free;
+} list_item;
 
 typedef struct list {
-    node **nodes;
+    list_item **items;
     size_t length;
     size_t size;
 } list;
@@ -62,14 +70,11 @@ list *list_get_list(const list *, size_t);
 map *list_get_map(const list *, size_t);
 void *list_get_generic(const list *, size_t);
 
-bool list_replace_pointer(list *, size_t, ltype, size_t, void *);
-bool list_replace(list *, size_t, ltype, size_t, const void *);
-bool list_insert_pointer(list *, size_t, ltype, size_t, void *);
-bool list_insert(list *, size_t, ltype, size_t, const void *);
-bool list_append_pointer(list *, ltype, size_t, void *);
-bool list_append(list *, ltype, size_t, const void *);
+bool list_replace(list *, size_t, const list_item *);
+bool list_insert(list *, size_t, const list_item *);
+bool list_append(list *, const list_item *);
 
-void list_pop(list *, size_t, ltype *, size_t *, void **);
+void list_pop(list *, size_t, list_item *);
 void list_remove(list *, size_t);
 void list_empty(list *);
 void list_free(list *);

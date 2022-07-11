@@ -157,9 +157,9 @@ list *json_array_to_list(json_object *value){
     bool success = true;
 
     for (size_t index = 0; index < length; ++index){
-        json_object *item = json_object_array_get_idx(value, index);
+        json_object *itemobj = json_object_array_get_idx(value, index);
 
-        if (!item){
+        if (!itemobj){
             log_write(
                 logger,
                 LOG_WARNING,
@@ -170,11 +170,13 @@ list *json_array_to_list(json_object *value){
             continue;
         }
 
-        json_type type = json_object_get_type(item);
+        json_type type = json_object_get_type(itemobj);
+
+        list_item item = {0};
 
         /* this one calls recursively... any better way? */
         if (type == json_type_array){
-            list *tmp = json_array_to_list(item);
+            list *tmp = json_array_to_list(itemobj);
 
             if (!tmp){
                 log_write(
@@ -189,45 +191,33 @@ list *json_array_to_list(json_object *value){
                 break;
             }
 
-            success = list_append_pointer(
-                l,
-                L_TYPE_LIST,
-                sizeof(*tmp),
-                tmp
-            );
+            item.type = L_TYPE_LIST;
+            item.size = sizeof(*tmp);
+            item.data = tmp;
         }
         else if (type == json_type_boolean){
-            bool tmp = json_object_get_boolean(item);
+            bool tmp = json_object_get_boolean(itemobj);
 
-            success = list_append(
-                l,
-                L_TYPE_BOOL,
-                sizeof(tmp),
-                &tmp
-            );
+            item.type = L_TYPE_BOOL;
+            item.size = sizeof(tmp);
+            item.data_copy = &tmp;
         }
         else if (type == json_type_double){
-            double tmp = json_object_get_double(item);
+            double tmp = json_object_get_double(itemobj);
 
-            success = list_append(
-                l,
-                L_TYPE_DOUBLE,
-                sizeof(tmp),
-                &tmp
-            );
+            item.type = L_TYPE_DOUBLE;
+            item.size = sizeof(tmp);
+            item.data_copy = &tmp;
         }
         else if (type == json_type_int){
-            int64_t tmp = json_object_get_int64(item);
+            int64_t tmp = json_object_get_int64(itemobj);
 
-            success = list_append(
-                l,
-                L_TYPE_INT,
-                sizeof(tmp),
-                &tmp
-            );
+            item.type = L_TYPE_INT;
+            item.size = sizeof(tmp);
+            item.data_copy = &tmp;
         }
         else if (type == json_type_object){
-            map *tmp = json_to_map(item);
+            map *tmp = json_to_map(itemobj);
 
             if (!tmp){
                 log_write(
@@ -242,22 +232,16 @@ list *json_array_to_list(json_object *value){
                 break;
             }
 
-            success = list_append_pointer(
-                l,
-                L_TYPE_MAP,
-                sizeof(*tmp),
-                tmp
-            );
+            item.type = L_TYPE_MAP;
+            item.size = sizeof(*tmp);
+            item.data = tmp;
         }
         else if (type == json_type_string){
-            const char *tmp = json_object_get_string(item);
+            const char *tmp = json_object_get_string(itemobj);
 
-            success = list_append(
-                l,
-                L_TYPE_STRING,
-                json_object_get_string_len(item),
-                tmp
-            );
+            item.type = L_TYPE_STRING;
+            item.size = json_object_get_string_len(itemobj);
+            item.data_copy = tmp;
         }
         else {
             log_write(
@@ -267,12 +251,10 @@ list *json_array_to_list(json_object *value){
                 __FILE__
             );
 
-            success = false;
-        }
-
-        if (!success){
             break;
         }
+
+        success = list_append(l, &item);
     }
 
     if (!success){

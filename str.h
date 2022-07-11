@@ -23,5 +23,4 @@ bool string_from_time(const char *, char *, size_t);
 
 bool string_to_int(const char *, int *, int);
 
-
 #endif

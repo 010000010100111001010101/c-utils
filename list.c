@@ -14,167 +14,191 @@
 #define LIST_SHRINK_LOAD_FACTOR 0.25
 #define LIST_SHRINK_FACTOR 0.5
 
-typedef struct node {
-    ltype type;
-    size_t size;
-    void *data;
-} node;
-
 static logctx *logger = NULL;
 
 static size_t calculate_new_size(size_t s){
     return (s <= 1 ? s + 1 : s) * LIST_GROWTH_FACTOR;
 }
 
-static node *node_init_pointer(ltype type, size_t size, void *data){
-    node *n = malloc(sizeof(*n));
+static bool check_availability(list *l){
+    size_t newlen = l->length + 1;
 
-    if (!n){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] node_init_pointer() - alloc for node object failed\n",
-            __FILE__
-        );
-
-        return NULL;
-    }
-
-    n->type = type;
-    n->size = size;
-    n->data = data;
-
-    return n;
-}
-
-static node *node_init(ltype type, size_t size, const void *data){
-    node *n = malloc(sizeof(*n));
-
-    if (!n){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] node_init() - node alloc failed\n",
-            __FILE__
-        );
-
-        return NULL;
-    }
-
-    n->type = type;
-    n->size = size;
-
-    if (type == L_TYPE_LIST){
-        n->data = list_copy(data);
-
-        if (!n->data){
+    if (newlen >= l->size){
+        if (!list_resize(l, calculate_new_size(l->size))){
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] node_init() - list copy failed\n",
+                "[%s] check_availability() - list_resize call failed\n",
                 __FILE__
             );
 
-            free(n);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static list_item *item_init_pointer(ltype type, size_t size, void *data, list_generic_free generic_free){
+    list_item *i = malloc(sizeof(*i));
+
+    if (!i){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] item_init_pointer() - item object alloc failed\n",
+            __FILE__
+        );
+
+        return NULL;
+    }
+
+    i->type = type;
+    i->size = size;
+    i->data = data;
+    i->generic_free = generic_free;
+
+    return i;
+}
+
+static list_item *item_init(ltype type, size_t size, const void *data, list_generic_free generic_free){
+    list_item *i = malloc(sizeof(*i));
+
+    if (!i){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] item_init() - item object alloc failed\n",
+            __FILE__
+        );
+
+        return NULL;
+    }
+
+    i->type = type;
+    i->size = size;
+    i->generic_free = generic_free;
+
+    if (type == L_TYPE_LIST){
+        i->data = list_copy(data);
+
+        if (!i->data){
+            log_write(
+                logger,
+                LOG_ERROR,
+                "[%s] item_init() - list copy failed\n",
+                __FILE__
+            );
+
+            free(i);
 
             return NULL;
         }
     }
     else if (type == L_TYPE_MAP){
-        n->data = map_copy(data);
+        i->data = map_copy(data);
 
-        if (!n->data){
+        if (!i->data){
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] node_init() - map copy failed\n",
+                "[%s] item_init() - map copy failed\n",
                 __FILE__
             );
 
-            free(n);
+            free(i);
 
             return NULL;
         }
     }
     else if (type == L_TYPE_NULL){
-        n->data = NULL;
+        i->data = NULL;
     }
     else if (type == L_TYPE_STRING){
-        n->data = malloc(size + 1);
+        i->data = malloc(size + 1);
 
-        if (!n->data){
+        if (!i->data){
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] node_init() - node data alloc failed\n",
+                "[%s] item_init() - item data alloc failed\n",
                 __FILE__
             );
 
-            free(n);
+            free(i);
 
             return NULL;
         }
 
-        string_copy(data, n->data, size);
+        string_copy(data, i->data, size);
     }
     else {
-        n->data = malloc(size);
+        i->data = malloc(size);
 
-        if (!n->data){
+        if (!i->data){
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] node_init() - node data alloc failed\n",
+                "[%s] item_init() - item data alloc failed\n",
                 __FILE__
             );
 
-            free(n);
+            free(i);
 
             return NULL;
         }
 
-        memcpy(n->data, data, size);
+        memcpy(i->data, data, size);
     }
 
-    return n;
+    return i;
 }
 
-static void node_free(node *n){
-    if (!n){
+static void item_free(list_item *i){
+    if (!i){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] node_free() - node is NULL\n",
+            "[%s] item_free() - item is NULL\n",
             __FILE__
         );
 
         return;
     }
 
-    switch (n->type){
+    switch (i->type){
+    case L_TYPE_GENERIC:
+        if (i->generic_free){
+            i->generic_free(i->data);
+        }
+        else {
+            free(i->data);
+        }
+
+        break;
     case L_TYPE_LIST:
-        list_free(n->data);
+        list_free(i->data);
 
         break;
     case L_TYPE_MAP:
-        map_free(n->data);
+        map_free(i->data);
 
         break;
     case L_TYPE_NULL:
         break;
     default:
-        free(n->data);
+        free(i->data);
     }
 
-    free(n);
+    free(i);
 }
 
-static node *get_node(const list *l, size_t pos, ltype type){
+static list_item *get_item(const list *l, size_t pos, ltype type){
     if (!l){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] get_node() - list is NULL\n",
+            "[%s] get_list_item() - list is NULL\n",
             __FILE__
         );
 
@@ -184,33 +208,33 @@ static node *get_node(const list *l, size_t pos, ltype type){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] get_node() - position out of range\n",
+            "[%s] get_list_item() - position out of range\n",
             __FILE__
         );
 
         return NULL;
     }
 
-    node *n = l->nodes[pos];
+    list_item *i = l->items[pos];
 
-    if (!n){
+    if (!i){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] get_node() - unable to get node\n",
+            "[%s] get_list_item() - unable to get item\n",
             __FILE__
         );
     }
-    else if (type != L_TYPE_RESERVED_EMPTY && n->type != type){
+    else if (type != L_TYPE_RESERVED_EMPTY && i->type != type){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] get_node() - node type does *not* match!\n",
+            "[%s] get_list_item() - item type does *iot* match!\n",
             __FILE__
         );
     }
 
-    return n;
+    return i;
 }
 
 list *list_init(void){
@@ -229,13 +253,13 @@ list *list_init(void){
 
     l->length = 0;
     l->size = LIST_MINIMUM_SIZE;
-    l->nodes = calloc(l->size, sizeof(*l->nodes));
+    l->items = calloc(l->size, sizeof(*l->items));
 
-    if (!l->nodes){
+    if (!l->items){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] list_init() - nodes allocation failed\n",
+            "[%s] list_init() - items allocation failed\n",
             __FILE__
         );
 
@@ -273,13 +297,13 @@ list *list_copy(const list *l){
     }
 
     for (size_t index = 0; index < l->length; ++index){
-        const node *n = get_node(l, index, L_TYPE_RESERVED_EMPTY);
+        const list_item *i = get_item(l, index, L_TYPE_RESERVED_EMPTY);
 
-        if (!list_append(copy, n->type, n->size, n->data)){
+        if (!list_append(copy, i)){
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] list_copy() - node copy failed\n",
+                "[%s] list_copy() - list_item copy failed\n",
                 __FILE__
             );
 
@@ -327,15 +351,15 @@ bool list_resize(list *l, size_t size){
 
     if (size < l->length){
         for (size_t index = size; index < l->length; ++index){
-            node_free(l->nodes[index]);
+            item_free(l->items[index]);
         }
 
         l->length = size;
     }
 
-    node **nodes = realloc(l->nodes, size * sizeof(*nodes));
+    list_item **items = realloc(l->items, size * sizeof(*items));
 
-    if (!nodes){
+    if (!items){
         log_write(
             logger,
             LOG_ERROR,
@@ -346,7 +370,7 @@ bool list_resize(list *l, size_t size){
         return false;
     }
 
-    l->nodes = nodes;
+    l->items = items;
     l->size = size;
 
     return true;
@@ -383,13 +407,13 @@ size_t list_get_size(const list *l){
 }
 
 size_t list_get_item_size(const list *l, size_t pos){
-    const node *n = get_node(l, pos, L_TYPE_RESERVED_EMPTY);
+    const list_item *i = get_item(l, pos, L_TYPE_RESERVED_EMPTY);
 
-    if (!n){
+    if (!i){
         return 0;
     }
 
-    return n->size;
+    return i->size;
 }
 
 bool list_contains(const list *l, size_t size, const void *data){
@@ -405,9 +429,9 @@ bool list_contains(const list *l, size_t size, const void *data){
     }
 
     for (size_t index = 0; index < l->length; ++index){
-        const node *n = get_node(l, index, L_TYPE_RESERVED_EMPTY);
+        const list_item *i = get_item(l, index, L_TYPE_RESERVED_EMPTY);
 
-        if (size == n->size && memcmp(data, n->data, n->size)){
+        if (size == i->size && memcmp(data, i->data, i->size)){
             return true;
         }
     }
@@ -416,156 +440,124 @@ bool list_contains(const list *l, size_t size, const void *data){
 }
 
 ltype list_get_type(const list *l, size_t pos){
-    const node *n = get_node(l, pos, L_TYPE_RESERVED_EMPTY);
+    const list_item *i = get_item(l, pos, L_TYPE_RESERVED_EMPTY);
 
-    if (!n){
+    if (!i){
         return L_TYPE_RESERVED_ERROR;
     }
 
-    return n->type;
+    return i->type;
 }
 
 bool list_get_bool(const list *l, size_t pos){
-    const node *n = get_node(l, pos, L_TYPE_BOOL);
+    const list_item *i = get_item(l, pos, L_TYPE_BOOL);
 
-    if (!n){
+    if (!i){
         return false;
     }
 
-    return *(bool *)n->data;
+    return *(bool *)i->data;
 }
 
 char list_get_char(const list *l, size_t pos){
-    const node *n = get_node(l, pos, L_TYPE_CHAR);
+    const list_item *i = get_item(l, pos, L_TYPE_CHAR);
 
-    if (!n){
+    if (!i){
         return 0;
     }
 
-    return *(char *)n->data;
+    return *(char *)i->data;
 }
 
 double list_get_double(const list *l, size_t pos){
-    const node *n = get_node(l, pos, L_TYPE_DOUBLE);
+    const list_item *i = get_item(l, pos, L_TYPE_DOUBLE);
 
-    if (!n){
+    if (!i){
         return 0.0;
     }
 
-    return *(double *)n->data;
+    return *(double *)i->data;
 }
 
 int64_t list_get_int(const list *l, size_t pos){
-    const node *n = get_node(l, pos, L_TYPE_INT);
+    const list_item *i = get_item(l, pos, L_TYPE_INT);
 
-    if (!n){
+    if (!i){
         return 0;
     }
 
-    return *(int64_t *)n->data;
+    return *(int64_t *)i->data;
 }
 
 size_t list_get_size_t(const list *l, size_t pos){
-    const node *n = get_node(l, pos, L_TYPE_SIZE_T);
+    const list_item *i = get_item(l, pos, L_TYPE_SIZE_T);
 
-    if (!n){
+    if (!i){
         return 0;
     }
 
-    return *(size_t *)n->data;
+    return *(size_t *)i->data;
 }
 
 /*
  * READ WARNING FOR THESE FUNCTIONS IN HEADER FILE
  */
 char *list_get_string(const list *l, size_t pos){
-    const node *n = get_node(l, pos, L_TYPE_STRING);
+    const list_item *i = get_item(l, pos, L_TYPE_STRING);
 
-    if (!n){
+    if (!i){
         return NULL;
     }
 
-    return n->data;
+    return i->data;
 }
 
 list *list_get_list(const list *l, size_t pos){
-    const node *n = get_node(l, pos, L_TYPE_LIST);
+    const list_item *i = get_item(l, pos, L_TYPE_LIST);
 
-    if (!n){
+    if (!i){
         return NULL;
     }
 
-    return n->data;
+    return i->data;
 }
 
 map *list_get_map(const list *l, size_t pos){
-    const node *n = get_node(l, pos, L_TYPE_MAP);
+    const list_item *i = get_item(l, pos, L_TYPE_MAP);
 
-    if (!n){
+    if (!i){
         return NULL;
     }
 
-    return n->data;
+    return i->data;
 }
 
 void *list_get_generic(const list *l, size_t pos){
-    const node *n = get_node(l, pos, L_TYPE_GENERIC);
+    const list_item *i = get_item(l, pos, L_TYPE_GENERIC);
 
-    if (!n){
+    if (!i){
         return NULL;
     }
 
-    return n->data;
+    return i->data;
 }
 
-bool list_replace_pointer(list *l, size_t pos, ltype type, size_t size, void *data){
+bool list_replace(list *l, size_t pos, const list_item *item){
     if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_replace_pointer() - list is NULL\n",
-            __FILE__
-        );
-
-        return false;
-    }
-    else if (pos >= l->length){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_replace_pointer() - pos greater than list length\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
-    node *n = node_init_pointer(type, size, data);
-
-    if (!n){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] list_replace_pointer() - node initialization failed\n",
+            "[%s] list_replace() - list is NULL\n",
             __FILE__
         );
 
         return false;
     }
-
-    node_free(l->nodes[pos]);
-
-    l->nodes[pos] = n;
-
-    return true;
-}
-
-bool list_replace(list *l, size_t pos, ltype type, size_t size, const void *data){
-    if (!l){
+    else if (!item){
         log_write(
             logger,
-            LOG_WARNING,
-            "[%s] list_replace() - list is NULL\n",
+            LOG_ERROR,
+            "[%s] list_replace() - item is NULL\n",
             __FILE__
         );
 
@@ -582,116 +574,103 @@ bool list_replace(list *l, size_t pos, ltype type, size_t size, const void *data
         return false;
     }
 
-    node *n = node_init(type, size, data);
+    list_item *i = NULL;
 
-    if (!n){
+    if (item->data){
+        i = item_init_pointer(
+            item->type,
+            item->size,
+            item->data,
+            item->generic_free
+        );
+    }
+    else {
+        i = item_init(
+            item->type,
+            item->size,
+            item->data_copy,
+            item->generic_free
+        );
+    }
+
+    if (!i){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] list_replace() - node initialization failed\n",
+            "[%s] list_replace() - item object initialization failed\n",
             __FILE__
         );
 
         return false;
     }
 
-    node_free(l->nodes[pos]);
+    item_free(l->items[pos]);
 
-    l->nodes[pos] = n;
+    l->items[pos] = i;
 
     return true;
 }
 
-bool list_insert_pointer(list *l, size_t pos, ltype type, size_t size, void *data){
+bool list_insert(list *l, size_t pos, const list_item *item){
     if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_insert_pointer() - list is NULL\n",
-            __FILE__
-        );
-
-        return false;
-    }
-    else if (pos > l->length){
-        return list_append_pointer(l, type, size, data);
-    }
-
-    size_t newlen = l->length + 1;
-
-    if (newlen >= l->size){
-        if (!list_resize(l, calculate_new_size(l->size))){
-            log_write(
-                logger,
-                LOG_ERROR,
-                "[%s] list_insert_pointer() - list resizing failed\n",
-                __FILE__
-            );
-
-            return false;
-        }
-    }
-
-    node *n = node_init_pointer(type, size, data);
-
-    if (!n){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] list_insert_pointer() - node initialization failed\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
-    for (size_t index = l->length; index > pos; --index){
-        l->nodes[index] = l->nodes[index - 1];
-    }
-
-    l->nodes[pos] = n;
-    l->length = newlen;
-
-    return true;
-}
-
-bool list_insert(list *l, size_t pos, ltype type, size_t size, const void *data){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
             "[%s] list_insert() - list is NULL\n",
             __FILE__
         );
 
         return false;
     }
-    else if (pos > l->length){
-        return list_append(l, type, size, data);
-    }
-
-    size_t newlen = l->length + 1;
-
-    if (newlen >= l->size){
-        if (!list_resize(l, calculate_new_size(l->size))){
-            log_write(
-                logger,
-                LOG_ERROR,
-                "[%s] list_insert() - list resizing failed\n",
-                __FILE__
-            );
-
-            return false;
-        }
-    }
-
-    node *n = node_init(type, size, data);
-
-    if (!n){
+    else if (!item){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] list_insert() - node initialization failed\n",
+            "[%s] list_insert() - item is NULL\n",
+            __FILE__
+        );
+
+        return false;
+    }
+    else if (pos > l->length){
+        return list_append(l, item);
+    }
+
+    if (!check_availability(l)){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] list_insert() - check_availability call failed\n",
+            __FILE__
+        );
+
+        return false;
+    }
+
+    list_item *i = NULL;
+
+    if (item->data){
+        i = item_init_pointer(
+            item->type,
+            item->size,
+            item->data,
+            item->generic_free
+        );
+    }
+    else {
+        i = item_init(
+            item->type,
+            item->size,
+            item->data_copy,
+            item->generic_free
+        );
+    }
+
+    if (!i){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] list_insert() - item object initialization failed\n",
             __FILE__
         );
 
@@ -699,124 +678,110 @@ bool list_insert(list *l, size_t pos, ltype type, size_t size, const void *data)
     }
 
     for (size_t index = l->length; index > pos; --index){
-        l->nodes[index] = l->nodes[index - 1];
+        l->items[index] = l->items[index - 1];
     }
 
-    l->nodes[pos] = n;
-    l->length = newlen;
+    l->items[pos] = i;
+    l->length += 1;
 
     return true;
 }
 
-bool list_append_pointer(list *l, ltype type, size_t size, void *data){
+bool list_append(list *l, const list_item *item){
     if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_append_pointer() - list is NULL\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
-    size_t newlen = l->length + 1;
-
-    if (newlen >= l->size){
-        if (!list_resize(l, calculate_new_size(l->size))){
-            log_write(
-                logger,
-                LOG_ERROR,
-                "[%s] list_append_pointer() - list resizing failed\n",
-                __FILE__
-            );
-
-            return false;
-        }
-    }
-
-    node *n = node_init_pointer(type, size, data);
-
-    if (!n){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] list_append_pointer() - node initialization failed\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
-    l->nodes[l->length] = n;
-    l->length = newlen;
-
-    return true;
-}
-
-bool list_append(list *l, ltype type, size_t size, const void *data){
-    if (!l){
-        log_write(
-            logger,
-            LOG_WARNING,
             "[%s] list_append() - list is NULL\n",
             __FILE__
         );
 
         return false;
     }
-
-    size_t newlen = l->length + 1;
-
-    if (newlen >= l->size){
-        if (!list_resize(l, calculate_new_size(l->size))){
-            log_write(
-                logger,
-                LOG_ERROR,
-                "[%s] list_append() - list resizing failed\n",
-                __FILE__
-            );
-
-            return false;
-        }
-    }
-
-    node *n = node_init(type, size, data);
-
-    if (!n){
+    else if (!item){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] list_append() - node initialization failed\n",
+            "[%s] list_append() - item is NULL\n",
             __FILE__
         );
 
         return false;
     }
 
-    l->nodes[l->length] = n;
-    l->length = newlen;
+    if (!check_availability(l)){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] list_append() - check_availability call failed\n",
+            __FILE__
+        );
+
+        return false;
+    }
+
+    list_item *i = NULL;
+
+    if (item->data){
+        i = item_init_pointer(
+            item->type,
+            item->size,
+            item->data,
+            item->generic_free
+        );
+    }
+    else {
+        i = item_init(
+            item->type,
+            item->size,
+            item->data_copy,
+            item->generic_free
+        );
+    }
+
+    if (!i){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] list_append() - item object initialization failed\n",
+            __FILE__
+        );
+
+        return false;
+    }
+
+    l->items[l->length++] = i;
 
     return true;
 }
 
-void list_pop(list *l, size_t pos, ltype *type, size_t *size, void **data){
-    node *n = get_node(l, pos, L_TYPE_RESERVED_EMPTY);
+void list_pop(list *l, size_t pos, list_item *item){
+    list_item *i = get_item(l, pos, L_TYPE_RESERVED_EMPTY);
 
-    if (type){
-        *type = n ? n->type : L_TYPE_RESERVED_ERROR;
+    if (!i){
+        return;
     }
 
-    if (size){
-        *size = n ? n->size : 0;
+    if (item){
+        item->type = i->type;
+        item->size = i->size;
+        item->data = i->data;
+        item->generic_free = i->generic_free;
+
+        if (item->data){
+            i->type = L_TYPE_NULL;
+            i->size = 0;
+            i->data = NULL;
+            i->generic_free = NULL;
+        }
     }
-
-    if (data){
-        *data = n ? n->data : NULL;
-
-        n->type = L_TYPE_NULL;
-        n->size = 0;
-        n->data = NULL;
+    else {
+        log_write(
+            logger,
+            LOG_DEBUG,
+            "[%s] list_pop() - item is NULL -- removing anyway\n",
+            __FILE__
+        );
     }
 
     list_remove(l, pos);
@@ -844,10 +809,10 @@ void list_remove(list *l, size_t pos){
         return;
     }
 
-    node_free(l->nodes[pos]);
+    item_free(l->items[pos]);
 
     for (size_t index = pos; index < l->length; ++index){
-        l->nodes[index] = l->nodes[index + 1];
+        l->items[index] = l->items[index + 1];
     }
 
     --l->length;
@@ -900,9 +865,9 @@ void list_free(list *l){
     }
 
     for (size_t index = 0; index < l->length; ++index){
-        node_free(l->nodes[index]);
+        item_free(l->items[index]);
     }
 
-    free(l->nodes);
+    free(l->items);
     free(l);
 }

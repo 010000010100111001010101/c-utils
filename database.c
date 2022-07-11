@@ -83,7 +83,7 @@ static bool append_rows_named(sqlite3 *db, sqlite3_stmt *stmt, list *res){
                 log_write(
                     logger,
                     LOG_ERROR,
-                    "[%s] append_rows_named() - map_set failed\n",
+                    "[%s] append_rows_named() - map_set call failed\n",
                     __FILE__
                 );
 
@@ -93,11 +93,16 @@ static bool append_rows_named(sqlite3 *db, sqlite3_stmt *stmt, list *res){
             }
         }
 
-        if (!list_append_pointer(res, L_TYPE_MAP, sizeof(*row), row)){
+        list_item item = {0};
+        item.type = L_TYPE_MAP;
+        item.size = sizeof(*row);
+        item.data = row;
+
+        if (!list_append(res, &item)){
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] append_rows_named() - list_append_pointer failed\n",
+                "[%s] append_rows_named() - list_append call failed\n",
                 __FILE__
             );
 
@@ -134,7 +139,7 @@ static bool append_rows(sqlite3 *db, sqlite3_stmt *stmt, list *res){
                 log_write(
                     logger,
                     LOG_ERROR,
-                    "[%s] append_rows() - sqlite3_step failed: %s\n",
+                    "[%s] append_rows() - sqlite3_step call failed: %s\n",
                     __FILE__,
                     sqlite3_errmsg(db)
                 );
@@ -144,56 +149,45 @@ static bool append_rows(sqlite3 *db, sqlite3_stmt *stmt, list *res){
                 return false;
             }
 
-            bool success;
             int ctype = sqlite3_column_type(stmt, index);
+
+            list_item item = {0};
 
             if (ctype == SQLITE_FLOAT){
                 double value = sqlite3_column_double(stmt, index);
 
-                success = list_append(
-                    row,
-                    L_TYPE_DOUBLE,
-                    sizeof(value),
-                    &value
-                );
+                item.type = L_TYPE_DOUBLE;
+                item.size = sizeof(value);
+                item.data_copy = &value;
             }
             else if (ctype == SQLITE_INTEGER){
                 int value = sqlite3_column_int(stmt, index);
 
-                success = list_append(
-                    row,
-                    L_TYPE_INT,
-                    sizeof(value),
-                    &value
-                );
+                item.type = L_TYPE_INT;
+                item.size = sizeof(value);
+                item.data_copy = &value;
             }
             else if (ctype == SQLITE_NULL){
                 void *value = NULL;
 
-                success = list_append(
-                    row,
-                    L_TYPE_NULL,
-                    sizeof(value),
-                    value
-                );
+                item.type = L_TYPE_NULL;
+                item.size = sizeof(value);
+                item.data_copy = value;
             }
             else {
                 const void *value = sqlite3_column_blob(stmt, index);
                 size_t valuelen = sqlite3_column_bytes(stmt, index);
 
-                success = list_append(
-                    row,
-                    L_TYPE_STRING,
-                    valuelen,
-                    value
-                );
+                item.type = L_TYPE_STRING;
+                item.size = valuelen;
+                item.data_copy = value;
             }
 
-            if (!success){
+            if (!list_append(row, &item)){
                 log_write(
                     logger,
                     LOG_ERROR,
-                    "[%s] append_rows() - list_append failed\n",
+                    "[%s] append_rows() - list_append call failed\n",
                     __FILE__
                 );
 
@@ -203,11 +197,16 @@ static bool append_rows(sqlite3 *db, sqlite3_stmt *stmt, list *res){
             }
         }
 
-        if (!list_append_pointer(res, L_TYPE_LIST, sizeof(*row), row)){
+        list_item item = {0};
+        item.type = L_TYPE_LIST;
+        item.size = sizeof(*row);
+        item.data = row;
+
+        if (!list_append(res, &item)){
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] append_rows() - list_append_pointer failed\n",
+                "[%s] append_rows() - list_append call failed\n",
                 __FILE__
             );
 

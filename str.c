@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include "str.h"
 
 #include "log.h"
@@ -176,7 +178,12 @@ list *string_split_len(const char *input, size_t inputlen, const char *delim, lo
     size_t delimlen = strlen(delim);
 
     if (count == 0 || delimlen == 0){
-        if (!list_append(tokens, L_TYPE_STRING, inputlen, input)){
+        list_item item = {0};
+        item.type = L_TYPE_STRING;
+        item.size = inputlen;
+        item.data_copy = input;
+
+        if (!list_append(tokens, &item)){
             list_free(tokens);
 
             return NULL;
@@ -192,7 +199,12 @@ list *string_split_len(const char *input, size_t inputlen, const char *delim, lo
     while ((ptr = strstr(&input[ptrindex], delim))){
         size_t tokenlen = ptr - &input[ptrindex];
 
-        if (!list_append(tokens, L_TYPE_STRING, tokenlen, &input[ptrindex])){
+        list_item item = {0};
+        item.type = L_TYPE_STRING;
+        item.size = tokenlen;
+        item.data_copy = input + ptrindex;
+
+        if (!list_append(tokens, &item)){
             list_free(tokens);
 
             return NULL;
@@ -208,14 +220,12 @@ list *string_split_len(const char *input, size_t inputlen, const char *delim, lo
     if (ptrindex <= inputlen){
         size_t tokenlen = inputlen - ptrindex;
 
-        if (!list_append(tokens, L_TYPE_STRING, tokenlen, &input[ptrindex])){
-            log_write(
-                logger,
-                LOG_ERROR,
-                "[%s] string_split_len() - list_append() failed\n",
-                __FILE__
-            );
+        list_item item = {0};
+        item.type = L_TYPE_STRING;
+        item.size = tokenlen;
+        item.data_copy = input + ptrindex;
 
+        if (!list_append(tokens, &item)){
             list_free(tokens);
 
             return NULL;
@@ -229,7 +239,7 @@ list *string_split(const char *input, const char *delim, long count){
     if (!input){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] string_split() - input is NULL\n",
             __FILE__
         );
@@ -239,7 +249,7 @@ list *string_split(const char *input, const char *delim, long count){
     else if (!delim){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] string_split() - delim is NULL\n",
             __FILE__
         );
@@ -356,6 +366,17 @@ char *string_upper(char *input){
 }
 
 bool string_from_time(const char *format, char *output, size_t outputsize){
+    if (!output){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] string_from_time() - format is NULL\n",
+            __FILE__
+        );
+
+        return false;
+    }
+
     time_t timet = time(NULL);
     struct tm *timetm = localtime(&timet);
 
@@ -388,7 +409,7 @@ bool string_to_int(const char *input, int *output, int base){
     if (!input){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] string_to_int() - input is NULL\n",
             __FILE__
         );

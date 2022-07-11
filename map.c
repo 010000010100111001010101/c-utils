@@ -1097,13 +1097,14 @@ void map_pop(map *m, size_t size, const void *key, map_item *value){
             n->value->type = M_TYPE_NULL;
             n->value->size = 0;
             n->value->data = NULL;
+            n->value->generic_free = NULL;
         }
     }
     else {
         log_write(
             logger,
             LOG_DEBUG,
-            "[%s] map_pop() - value is NULL -- removing pair anyway\n",
+            "[%s] map_pop() - value is NULL -- removing anyway\n",
             __FILE__
         );
     }
