@@ -9,125 +9,6 @@
 
 static logctx *logger = NULL;
 
-static bool add_json_array_value_to_map(map *m, const char *key, json_object *value){
-    list *tmp = json_array_to_list(value);
-
-    if (!tmp){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] add_json_array_value() - failed to create list\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
-    map_item k = {0};
-    k.type = M_TYPE_STRING;
-    k.size = strlen(key);
-    k.data_copy = key;
-
-    map_item v = {0};
-    v.type = M_TYPE_LIST;
-    v.size = sizeof(*tmp);
-    v.data = tmp;
-
-    return map_set(m, &k, &v);
-}
-
-static bool add_json_bool_value_to_map(map *m, const char *key, json_object *value){
-    bool tmp = json_object_get_boolean(value);
-
-    map_item k = {0};
-    k.type = M_TYPE_STRING;
-    k.size = strlen(key);
-    k.data_copy = key;
-
-    map_item v = {0};
-    v.type = M_TYPE_BOOL;
-    v.size = sizeof(tmp);
-    v.data_copy = &tmp;
-
-    return map_set(m, &k, &v);
-}
-
-static bool add_json_double_value_to_map(map *m, const char *key, json_object *value){
-    double tmp = json_object_get_double(value);
-
-    map_item k = {0};
-    k.type = M_TYPE_STRING;
-    k.size = strlen(key);
-    k.data_copy = key;
-
-    map_item v = {0};
-    v.type = M_TYPE_DOUBLE;
-    v.size = sizeof(tmp);
-    v.data_copy = &tmp;
-
-    return map_set(m, &k, &v);
-}
-
-static bool add_json_int_value_to_map(map *m, const char *key, json_object *value){
-    int64_t tmp = json_object_get_int64(value);
-
-    map_item k = {0};
-    k.type = M_TYPE_STRING;
-    k.size = strlen(key);
-    k.data_copy = key;
-
-    map_item v = {0};
-    v.type = M_TYPE_INT;
-    v.size = sizeof(tmp);
-    v.data_copy = &tmp;
-
-    return map_set(m, &k, &v);
-}
-
-static bool add_json_object_value_to_map(map *m, const char *key, json_object *value){
-    map *tmp = json_to_map(value);
-
-    if (!tmp){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] add_json_object_value() - failed to create map\n",
-            __FILE__
-        );
-
-        return false;
-    }
-
-    map_item k = {0};
-    k.type = M_TYPE_STRING;
-    k.size = strlen(key);
-    k.data_copy = key;
-
-    map_item v = {0};
-    v.type = M_TYPE_MAP;
-    v.size = sizeof(*tmp);
-    v.data = tmp;
-
-    return map_set(m, &k, &v);
-}
-
-static bool add_json_string_value_to_map(map *m, const char *key, json_object *value){
-    size_t tmplen = json_object_get_string_len(value);
-    const char *tmp = json_object_get_string(value);
-
-    map_item k = {0};
-    k.type = M_TYPE_STRING;
-    k.size = strlen(key);
-    k.data_copy = key;
-
-    map_item v = {0};
-    v.type = M_TYPE_STRING;
-    v.size = tmplen;
-    v.data_copy = tmp;
-
-    return map_set(m, &k, &v);
-}
-
 list *json_array_to_list(json_object *value){
     if (json_object_get_type(value) != json_type_array){
         log_write(
@@ -404,34 +285,100 @@ map *json_to_map(json_object *json){
 
     while (!json_object_iter_equal(&curr, &end)){
         const char *key = json_object_iter_peek_name(&curr);
-        json_object *value = json_object_iter_peek_value(&curr); 
+        json_object *valueobj = json_object_iter_peek_value(&curr);
+        json_type type = valueobj ? json_object_get_type(valueobj) : json_type_null;
 
-        bool success = false;
-        json_type type = json_object_get_type(value);
+        map_item k = {0};
+        k.type = M_TYPE_STRING;
+        k.size = strlen(key);
+        k.data_copy = key;
+
+        map_item v = {0};
+
+        list *listvalue = NULL;
+        bool boolvalue = false;
+        double doublevalue = 0.0;
+        int64_t intvalue = 0;
+        const char *strvalue = NULL;
+        map *mapvalue = NULL;
 
         switch (type){
         case json_type_array:
-            success = add_json_array_value_to_map(m, key, value);
+            listvalue = json_array_to_list(valueobj);
+
+            if (!listvalue){
+                log_write(
+                    logger,
+                    LOG_ERROR,
+                    "[%s] json_to_map() - json_array_to_list call failed\n",
+                    __FILE__
+                );
+
+                break;
+            }
+
+            v.type = M_TYPE_LIST;
+            v.size = sizeof(*listvalue);
+            v.data = listvalue;
 
             break;
         case json_type_boolean:
-            success = add_json_bool_value_to_map(m, key, value);
+            boolvalue = json_object_get_boolean(valueobj);
+
+            v.type = M_TYPE_BOOL;
+            v.size = sizeof(boolvalue);
+            v.data_copy = &boolvalue;
 
             break;
         case json_type_double:
-            success = add_json_double_value_to_map(m, key, value);
+            doublevalue = json_object_get_double(valueobj);
+
+            v.type = M_TYPE_DOUBLE;
+            v.size = sizeof(doublevalue);
+            v.data_copy = &doublevalue;
 
             break;
         case json_type_int:
-            success = add_json_int_value_to_map(m, key, value);
+            intvalue = json_object_get_int64(valueobj);
+
+            v.type = M_TYPE_INT;
+            v.size = sizeof(intvalue);
+            v.data_copy = &intvalue;
+
+            break;
+        case json_type_null:
+            strvalue = NULL;
+
+            v.type = M_TYPE_NULL;
+            v.size = sizeof(strvalue);
+            v.data_copy = &strvalue;
 
             break;
         case json_type_object:
-            success = add_json_object_value_to_map(m, key, value);
+            mapvalue = json_to_map(valueobj);
+
+            if (!mapvalue){
+                log_write(
+                    logger,
+                    LOG_ERROR,
+                    "[%s] json_to_map() - json_to_map recursive call failed\n",
+                    __FILE__
+                );
+
+                break;
+            }
+
+            v.type = M_TYPE_MAP;
+            v.size = sizeof(*mapvalue);
+            v.data = mapvalue;
 
             break;
         case json_type_string:
-            success = add_json_string_value_to_map(m, key, value);
+            strvalue = json_object_get_string(valueobj);
+
+            v.type = M_TYPE_STRING;
+            v.size = strlen(strvalue);
+            v.data_copy = strvalue;
 
             break;
         default:
@@ -444,7 +391,7 @@ map *json_to_map(json_object *json){
             );
         }
 
-        if (!success){
+        if (!map_set(m, &k, &v)){
             log_write(
                 logger,
                 LOG_ERROR,
@@ -452,6 +399,13 @@ map *json_to_map(json_object *json){
                 __FILE__,
                 key
             );
+
+            if (listvalue){
+                list_free(listvalue);
+            }
+            else if (mapvalue){
+                map_free(mapvalue);
+            }
 
             map_free(m);
 
