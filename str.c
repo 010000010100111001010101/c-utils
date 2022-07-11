@@ -83,7 +83,7 @@ bool string_copy(const char *input, char *output, size_t outputsize){
     if (!input){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] string_copy() - input is NULL\n",
             __FILE__
         );
@@ -93,7 +93,7 @@ bool string_copy(const char *input, char *output, size_t outputsize){
     else if (!output){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] string_copy() - output is NULL\n",
             __FILE__
         );
@@ -151,7 +151,7 @@ list *string_split_len(const char *input, size_t inputlen, const char *delim, lo
     if (!input){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] string_split_len() - input is NULL\n",
             __FILE__
         );
@@ -161,7 +161,7 @@ list *string_split_len(const char *input, size_t inputlen, const char *delim, lo
     else if (!delim){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] string_split_len() - delim is NULL\n",
             __FILE__
         );
@@ -264,7 +264,7 @@ char *string_join(const list *input, const char *delim){
     if (!input){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] string_join() - input is NULL\n",
             __FILE__
         );
@@ -327,7 +327,7 @@ char *string_lower(char *input){
     if (!input){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] string_lower() - input is NULL\n",
             __FILE__
         );
@@ -348,7 +348,7 @@ char *string_upper(char *input){
     if (!input){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_ERROR,
             "[%s] string_upper() - input is NULL\n",
             __FILE__
         );
@@ -366,11 +366,21 @@ char *string_upper(char *input){
 }
 
 bool string_from_time(const char *format, char *output, size_t outputsize){
-    if (!output){
+    if (!format){
         log_write(
             logger,
             LOG_ERROR,
             "[%s] string_from_time() - format is NULL\n",
+            __FILE__
+        );
+
+        return false;
+    }
+    else if (!output){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] string_from_time() - output is NULL\n",
             __FILE__
         );
 
@@ -411,6 +421,16 @@ bool string_to_int(const char *input, int *output, int base){
             logger,
             LOG_ERROR,
             "[%s] string_to_int() - input is NULL\n",
+            __FILE__
+        );
+
+        return false;
+    }
+    else if (!output){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] string_to_int() - output is NULL\n",
             __FILE__
         );
 
