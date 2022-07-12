@@ -16,7 +16,7 @@ static bool append_rows_named(sqlite3 *db, sqlite3_stmt *stmt, list *res){
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] append_rows() - row object initialization failed\n",
+                "[%s] append_rows() - row initialization failed\n",
                 __FILE__
             );
 
@@ -29,7 +29,7 @@ static bool append_rows_named(sqlite3 *db, sqlite3_stmt *stmt, list *res){
             if (err != SQLITE_DONE && err != SQLITE_ROW){
                 log_write(
                     logger,
-                    LOG_ERROR,
+                    LOG_WARNING,
                     "[%s] append_rows() - sqlite3_step failed: %s\n",
                     __FILE__,
                     sqlite3_errmsg(db)
@@ -125,7 +125,7 @@ static bool append_rows(sqlite3 *db, sqlite3_stmt *stmt, list *res){
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] append_rows() - row object initialization failed\n",
+                "[%s] append_rows() - row initialization failed\n",
                 __FILE__
             );
 
@@ -138,7 +138,7 @@ static bool append_rows(sqlite3 *db, sqlite3_stmt *stmt, list *res){
             if (err != SQLITE_DONE && err != SQLITE_ROW){
                 log_write(
                     logger,
-                    LOG_ERROR,
+                    LOG_WARNING,
                     "[%s] append_rows() - sqlite3_step call failed: %s\n",
                     __FILE__,
                     sqlite3_errmsg(db)
@@ -339,7 +339,7 @@ bool database_execute(sqlite3 *db, const char *sql, const list *params, list **r
                     log_write(
                         logger,
                         LOG_WARNING,
-                        "[%s] database_execute() - cannot bind unknown node type %d\n",
+                        "[%s] database_execute() - unknown node type %d\n",
                         __FILE__,
                         type
                     );
@@ -376,7 +376,7 @@ bool database_execute(sqlite3 *db, const char *sql, const list *params, list **r
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] database_execute() - res object initialization failed\n",
+                "[%s] database_execute() - copy list initialization failed\n",
                 __FILE__
             );
 
@@ -406,7 +406,7 @@ bool database_execute(sqlite3 *db, const char *sql, const list *params, list **r
     else {
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] database_execute() - sqlite3_step call failed: %s\n",
             __FILE__,
             sqlite3_errmsg(db)
@@ -422,7 +422,7 @@ void database_free(sqlite3 *db){
     if (!db){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_DEBUG,
             "[%s] database_free() - database is NULL\n",
             __FILE__
         );

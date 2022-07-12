@@ -38,6 +38,31 @@ static size_t generate_index(uint32_t seed, size_t size){
     return (LCG_MULTIPLIER * seed + LCG_INCREMENT) & (size - 1);
 }
 
+static bool check_availability(map *m){
+    double load = (double)m->length / (double)m->size;
+
+    if (load >= MAP_GROWTH_LOAD_FACTOR){
+        size_t newsize = m->size << 1;
+
+        if (newsize <= m->size){
+            log_write(
+                logger,
+                LOG_WARNING,
+                "[%s] map_set() - newsize (%ld) <= m->size (%ld) -- unable to grow map\n",
+                __FILE__,
+                newsize,
+                m->size
+            );
+
+            return false;
+        }
+
+        if (!map_resize(m, newsize)){
+            return false;
+        }
+    }
+}
+
 static map_item *item_init_pointer(mtype type, size_t size, void *data, map_generic_free generic_free){
     map_item *i = malloc(sizeof(*i));
 
@@ -85,7 +110,7 @@ static map_item *item_init(mtype type, size_t size, const void *data, map_generi
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] item_init() - item data alloc failed\n",
+                "[%s] item_init() - item string alloc failed\n",
                 __FILE__
             );
 
@@ -103,7 +128,7 @@ static map_item *item_init(mtype type, size_t size, const void *data, map_generi
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] item_init() - list copy failed\n",
+                "[%s] item_init() - list_copy call failed\n",
                 __FILE__
             );
 
@@ -119,7 +144,7 @@ static map_item *item_init(mtype type, size_t size, const void *data, map_generi
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] item_init() - map copy failed\n",
+                "[%s] item_init() - map_copy call failed\n",
                 __FILE__
             );
 
@@ -158,7 +183,7 @@ static void item_free(map_item *i){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] item_free() - item is NULL\n",
+            "[%s] item_free() - item should *not* be NULL\n",
             __FILE__
         );
 
@@ -260,7 +285,7 @@ static void node_free(node *n){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] node_free() - node is NULL\n",
+            "[%s] node_free() - node should *not* be NULL\n",
             __FILE__
         );
 
@@ -277,7 +302,7 @@ static bool get_node_index(const map *m, size_t *ret, size_t size, const void *k
     if (!m){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] get_node_index() - map is NULL\n",
             __FILE__
         );
@@ -287,7 +312,7 @@ static bool get_node_index(const map *m, size_t *ret, size_t size, const void *k
     else if (!key){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] get_node_index() - key is NULL\n",
             __FILE__
         );
@@ -332,7 +357,7 @@ static node *get_node(const map *m, size_t size, const void *key, mtype type){
     if (!m){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] get_node() - map is NULL\n",
             __FILE__
         );
@@ -342,7 +367,7 @@ static node *get_node(const map *m, size_t size, const void *key, mtype type){
     else if (!key){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] get_node() - key is NULL\n",
             __FILE__
         );
@@ -353,31 +378,16 @@ static node *get_node(const map *m, size_t size, const void *key, mtype type){
     size_t index;
 
     if (!get_node_index(m, &index, size, key)){
-        log_write(
-            logger,
-            LOG_DEBUG,
-            "[%s] get_node() - unable to get node index\n",
-            __FILE__
-        );
-
         return NULL;
     }
 
     node *n = m->nodes[index];
 
-    if (!n){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] get_node() - node is NULL after get_node_index --- THIS IS A BUG! ---\n",
-            __FILE__
-        );
-    }
-    else if (type != M_TYPE_RESERVED_EMPTY && n->value->type != type){
+    if (type != M_TYPE_RESERVED_EMPTY && n->value->type != type){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] get_node() - node type does *not* match!\n",
+            "[%s] get_node() - node type does *not* match\n",
             __FILE__
         );
     }
@@ -386,6 +396,28 @@ static node *get_node(const map *m, size_t size, const void *key, mtype type){
 }
 
 map *map_init(void){
+    if (MAP_MINIMUM_SIZE <= 0){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] map_init() - MAP_MINIMUM_SIZE must be greater than 0\n",
+            __FILE__
+        );
+
+        return NULL;
+    }
+    else if (!is_power_of_two(MAP_MINIMUM_SIZE)){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] map_init() - MAP_MINIMUM_SIZE must be a power of 2\n",
+            __FILE__
+        );
+
+        return NULL;
+    }
+
+
     map *m = calloc(1, sizeof(*m));
 
     if (!m){
@@ -479,27 +511,28 @@ bool map_resize(map *m, size_t size){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] resize_map() - map is NULL\n",
+            "[%s] map_resize() - map is NULL\n",
             __FILE__
         );
 
         return false;
     }
-    else if (size < MAP_MINIMUM_SIZE){
+    else if (size == 0 || size < MAP_MINIMUM_SIZE){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] resize_map() - size cannot be less than MAP_MINIMUM_SIZE\n",
-            __FILE__
+            "[%s] map_resize() - size cannot be 0 or less than MAP_MINIMUM_SIZE -- set to MAP_MINIMUM_SIZE (%d)\n",
+            __FILE__,
+            MAP_MINIMUM_SIZE
         );
 
-        return false;
+        size = MAP_MINIMUM_SIZE;
     }
     else if (!is_power_of_two(size)){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] resize_map() - size must be a power of 2\n",
+            "[%s] map_resize() - size must be a power of 2\n",
             __FILE__
         );
 
@@ -512,7 +545,7 @@ bool map_resize(map *m, size_t size){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] resize_map() - nodes alloc failed\n",
+            "[%s] map_resize() - nodes alloc failed\n",
             __FILE__
         );
 
@@ -626,7 +659,7 @@ bool map_iter_is_last(const mapiter *iter){
     if (!iter){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] map_iter_is_last() - iterator is NULL\n",
             __FILE__
         );
@@ -636,7 +669,7 @@ bool map_iter_is_last(const mapiter *iter){
     else if (!iter->m){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] map_iter_is_last() - map is NULL\n",
             __FILE__
         );
@@ -647,7 +680,7 @@ bool map_iter_is_last(const mapiter *iter){
         log_write(
             logger,
             LOG_DEBUG,
-            "[%s] map_iter_is_last() - node is NULL -- map_iter_next hasn't been called\n",
+            "[%s] map_iter_is_last() - node is NULL -- map_iter_next hasn't been called or map is empty\n",
             __FILE__
         );
 
@@ -661,7 +694,7 @@ bool map_iter_get_key(const mapiter *iter, map_item *key){
     if (!iter){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] map_iter_get_key() - iterator is NULL\n",
             __FILE__
         );
@@ -671,7 +704,7 @@ bool map_iter_get_key(const mapiter *iter, map_item *key){
     else if (!iter->m){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] map_iter_get_key() - map is NULL\n",
             __FILE__
         );
@@ -682,7 +715,7 @@ bool map_iter_get_key(const mapiter *iter, map_item *key){
         log_write(
             logger,
             LOG_DEBUG,
-            "[%s] map_iter_get_key() - node is NULL -- map_iter_next hasn't been called\n",
+            "[%s] map_iter_get_key() - node is NULL -- map_iter_next hasn't been called or map is empty\n",
             __FILE__
         );
 
@@ -692,7 +725,7 @@ bool map_iter_get_key(const mapiter *iter, map_item *key){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] map_iter_get_key() - key is NULL\n",
+            "[%s] map_iter_get_key() - key is NULL -- unable to assign\n",
             __FILE__
         );
 
@@ -708,7 +741,7 @@ bool map_iter_get_value(const mapiter *iter, map_item *value){
     if (!iter){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] map_iter_get_value() - iterator is NULL\n",
             __FILE__
         );
@@ -718,7 +751,7 @@ bool map_iter_get_value(const mapiter *iter, map_item *value){
     else if (!iter->m){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] map_iter_get_value() - map is NULL\n",
             __FILE__
         );
@@ -728,8 +761,8 @@ bool map_iter_get_value(const mapiter *iter, map_item *value){
     else if (!iter->n){
         log_write(
             logger,
-            LOG_ERROR,
-            "[%s] map_iter_get_value() - node is NULL\n",
+            LOG_DEBUG,
+            "[%s] map_iter_get_value() - node is NULL -- map_iter_next hasn't been called or map is empty\n",
             __FILE__
         );
 
@@ -739,7 +772,7 @@ bool map_iter_get_value(const mapiter *iter, map_item *value){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] map_iter_get_value() - value is NULL\n",
+            "[%s] map_iter_get_value() - value is NULL -- unable to assign\n",
             __FILE__
         );
 
@@ -765,7 +798,7 @@ bool map_iter_next(mapiter *iter){
     else if (!iter->m){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] map_iter_next() - map is NULL\n",
             __FILE__
         );
@@ -792,7 +825,7 @@ bool map_iter_prev(mapiter *iter){
     else if (!iter->m){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] map_iter_prev() - map is NULL\n",
             __FILE__
         );
@@ -809,7 +842,7 @@ void map_iter_free(mapiter *iter){
     if (!iter){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_DEBUG,
             "[%s] map_iter_free() - iterator is NULL\n",
             __FILE__
         );
@@ -931,7 +964,7 @@ bool map_set(map *m, const map_item *key, const map_item *value){
     if (!m){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] map_set() - map is NULL\n",
             __FILE__
         );
@@ -941,7 +974,7 @@ bool map_set(map *m, const map_item *key, const map_item *value){
     else if (!key){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] map_set() - key is NULL\n",
             __FILE__
         );
@@ -951,40 +984,23 @@ bool map_set(map *m, const map_item *key, const map_item *value){
     else if (key->data){
         log_write(
             logger,
+            LOG_DEBUG,
+            "[%s] map_set() - key will *always* be copied -- set key in data_copy instead\n",
+            __FILE__
+        );
+
+        key->data_copy = key->data;
+    }
+
+    if (!check_availability(m)){
+        log_write(
+            logger,
             LOG_ERROR,
-            "[%s] map_set() - key will always be copied -- set key->data_copy instead\n",
+            "[%s] map_set() - check_availability call failed\n",
             __FILE__
         );
 
         return false;
-    }
-
-    double load = (double)m->length / (double)m->size;
-
-    if (load >= MAP_GROWTH_LOAD_FACTOR){
-        size_t newsize = m->size << 1;
-
-        if (newsize <= m->size){
-            log_write(
-                logger,
-                LOG_ERROR,
-                "[%s] map_set() - newsize <= m->size\n",
-                __FILE__
-            );
-
-            return false;
-        }
-
-        if (!map_resize(m, newsize)){
-            log_write(
-                logger,
-                LOG_ERROR,
-                "[%s] map_set() - failed to resize map\n",
-                __FILE__
-            );
-
-            return false;
-        }
     }
 
     uint32_t hash = generate_hash(m->seed, key->size, key->data_copy);
@@ -1020,7 +1036,7 @@ bool map_set(map *m, const map_item *key, const map_item *value){
                 log_write(
                     logger,
                     LOG_ERROR,
-                    "[%s] map_set() - replacement value initialization failed\n",
+                    "[%s] map_set() - item initialization failed\n",
                     __FILE__
                 );
 
@@ -1036,17 +1052,6 @@ bool map_set(map *m, const map_item *key, const map_item *value){
 
         index = generate_index(index, m->size);
         n = m->nodes[index];
-    }
-
-    if (n){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_set() - node is *not* NULL after loop --- THIS IS A BUG! ---\n",
-            __FILE__
-        );
-
-        return false;
     }
 
     n = node_init(key, value);
@@ -1104,7 +1109,7 @@ void map_pop(map *m, size_t size, const void *key, map_item *value){
         log_write(
             logger,
             LOG_DEBUG,
-            "[%s] map_pop() - value is NULL -- removing anyway\n",
+            "[%s] map_pop() - value is NULL -- removing but unable to assign\n",
             __FILE__
         );
     }
@@ -1113,32 +1118,36 @@ void map_pop(map *m, size_t size, const void *key, map_item *value){
 }
 
 void map_remove(map *m, size_t size, const void *key){
-    size_t index;
-
-    if (!get_node_index(m, &index, size, key)){
+    if (!m){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] map_remove() - unable to get node index\n",
+            "[%s] map_remove() - map is NULL\n",
             __FILE__
         );
 
+        return;
+    }
+    else if (!key){
+        log_write(
+            logger,
+            LOG_WARNING,
+            "[%s] map_remove() - key is NULL\n",
+            __FILE__
+        );
+
+        return;
+    }
+
+    size_t index;
+
+    if (!get_node_index(m, &index, size, key)){
         return;
     }
 
     node *n = m->nodes[index];
 
-    if (!n){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] map_remove() - key not found\n",
-            __FILE__
-        );
-
-        return;
-    }
-    else if (n == m->first){
+    if (n == m->first){
         m->first = n->next;
     }
     else if (n == m->last){
@@ -1164,7 +1173,7 @@ void map_free(map *m){
     if (!m){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_DEBUG,
             "[%s] map_free() - map is NULL\n",
             __FILE__
         );
@@ -1173,11 +1182,7 @@ void map_free(map *m){
     }
 
     for (size_t index = 0; index < m->size; ++index){
-        node *n = m->nodes[index];
-
-        if (n){
-            node_free(n);
-        }
+        node_free(m->nodes[index]);
     }
 
     free(m->nodes);

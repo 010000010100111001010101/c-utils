@@ -86,7 +86,7 @@ static list_item *item_init(ltype type, size_t size, const void *data, list_gene
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] item_init() - list copy failed\n",
+                "[%s] item_init() - list_copy call failed\n",
                 __FILE__
             );
 
@@ -102,7 +102,7 @@ static list_item *item_init(ltype type, size_t size, const void *data, list_gene
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] item_init() - map copy failed\n",
+                "[%s] item_init() - map_copy call failed\n",
                 __FILE__
             );
 
@@ -121,7 +121,7 @@ static list_item *item_init(ltype type, size_t size, const void *data, list_gene
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] item_init() - item data alloc failed\n",
+                "[%s] item_init() - item string alloc failed\n",
                 __FILE__
             );
 
@@ -159,7 +159,7 @@ static void item_free(list_item *i){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] item_free() - item is NULL\n",
+            "[%s] item_free() - item should *not* be NULL\n",
             __FILE__
         );
 
@@ -229,7 +229,7 @@ static list_item *get_item(const list *l, size_t pos, ltype type){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] get_list_item() - item type does *iot* match!\n",
+            "[%s] get_list_item() - item type does *not* match!\n",
             __FILE__
         );
     }
@@ -238,13 +238,24 @@ static list_item *get_item(const list *l, size_t pos, ltype type){
 }
 
 list *list_init(void){
+    if (LIST_MINIMUM_SIZE <= 0){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] list_init() - LIST_MINIMUM_SIZE must be greater than 0\n",
+            __FILE__
+        );
+
+        return NULL;
+    }
+
     list *l = calloc(1, sizeof(*l));
 
     if (!l){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] list_init() - list alloc failed\n",
+            "[%s] list_init() - list object alloc failed\n",
             __FILE__
         );
 
@@ -259,7 +270,7 @@ list *list_init(void){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] list_init() - items allocation failed\n",
+            "[%s] list_init() - items object alloc failed\n",
             __FILE__
         );
 
@@ -289,7 +300,7 @@ list *list_copy(const list *l){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] list_copy() - list alloc failed\n",
+            "[%s] list_copy() - list initialization failed\n",
             __FILE__
         );
 
@@ -303,7 +314,7 @@ list *list_copy(const list *l){
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] list_copy() - list_item copy failed\n",
+                "[%s] list_copy() - list_append call failed\n",
                 __FILE__
             );
 
@@ -320,33 +331,23 @@ bool list_resize(list *l, size_t size){
     if (!l){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] list_resize() - list is NULL\n",
             __FILE__
         );
 
         return false;
     }
-    else if (size == 0){
+    else if (size == 0 || size < LIST_MINIMUM_SIZE){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] list_resize() - size cannot be 0\n",
-            __FILE__
-        );
-
-        return false;
-    }
-    else if (size < LIST_MINIMUM_SIZE){
-        log_write(
-            logger,
-            LOG_WARNING,
-            "[%s] list_resize() - size cannot be less than LIST_MINIMUM_SIZE (%d)\n",
+            "[%s] list_resize() - size cannot be 0 or less than LIST_MINIMUM_SIZE -- set to LIST_MINIMUM_SIZE (%d)\n",
             __FILE__,
             LIST_MINIMUM_SIZE
         );
 
-        return false;
+        size = LIST_MINIMUM_SIZE;
     }
 
     if (size < l->length){
@@ -363,7 +364,7 @@ bool list_resize(list *l, size_t size){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] list_resize() - list initialization failed\n",
+            "[%s] list_resize() - items object realloc failed\n",
             __FILE__
         );
 
@@ -546,7 +547,7 @@ bool list_replace(list *l, size_t pos, const list_item *item){
     if (!l){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] list_replace() - list is NULL\n",
             __FILE__
         );
@@ -556,7 +557,7 @@ bool list_replace(list *l, size_t pos, const list_item *item){
     else if (!item){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] list_replace() - item is NULL\n",
             __FILE__
         );
@@ -567,8 +568,9 @@ bool list_replace(list *l, size_t pos, const list_item *item){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] list_replace() - pos greater than list length\n",
-            __FILE__
+            "[%s] list_replace() - position %ld is out of bounds\n",
+            __FILE__,
+            pos
         );
 
         return false;
@@ -615,7 +617,7 @@ bool list_insert(list *l, size_t pos, const list_item *item){
     if (!l){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] list_insert() - list is NULL\n",
             __FILE__
         );
@@ -625,7 +627,7 @@ bool list_insert(list *l, size_t pos, const list_item *item){
     else if (!item){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] list_insert() - item is NULL\n",
             __FILE__
         );
@@ -691,7 +693,7 @@ bool list_append(list *l, const list_item *item){
     if (!l){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] list_append() - list is NULL\n",
             __FILE__
         );
@@ -701,7 +703,7 @@ bool list_append(list *l, const list_item *item){
     else if (!item){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] list_append() - item is NULL\n",
             __FILE__
         );
@@ -779,7 +781,7 @@ void list_pop(list *l, size_t pos, list_item *item){
         log_write(
             logger,
             LOG_DEBUG,
-            "[%s] list_pop() - item is NULL -- removing anyway\n",
+            "[%s] list_pop() - item is NULL -- removing but unable to assign\n",
             __FILE__
         );
     }
@@ -802,8 +804,9 @@ void list_remove(list *l, size_t pos){
         log_write(
             logger,
             LOG_WARNING,
-            "[%s] list_remove() - pos out of range\n",
-            __FILE__
+            "[%s] list_remove() - position %ld is out of bounds\n",
+            __FILE__,
+            pos
         );
 
         return;
@@ -817,31 +820,28 @@ void list_remove(list *l, size_t pos){
 
     --l->length;
 
-    double load = (double)l->length / (double)l->size;
+    if (l->size > LIST_MINIMUM_SIZE){
+        double load = (double)l->length / (double)l->size;
 
-    if (load <= LIST_SHRINK_LOAD_FACTOR){
-        size_t newsize = l->size - ((l->size - l->length) * LIST_SHRINK_FACTOR);
+        if (load <= LIST_SHRINK_LOAD_FACTOR){
+            size_t newsize = l->size - ((l->size - l->length) * LIST_SHRINK_FACTOR);
 
-        if (newsize >= l->size){
-            log_write(
-                logger,
-                LOG_WARNING,
-                "[%s] list_remove() - newsize >= l->size\n",
-                __FILE__
-            );
+            if (newsize >= l->size){
+                log_write(
+                    logger,
+                    LOG_WARNING,
+                    "[%s] list_remove() - newsize (%ld) >= l->size (%ld) -- unable to shrink list\n",
+                    __FILE__,
+                    newsize,
+                    l->size
+                );
 
-            return;
-        }
+                return;
+            }
 
-        if (!list_resize(l, newsize)){
-            log_write(
-                logger,
-                LOG_WARNING,
-                "[%s] list_remove() - unable to shrink list\n",
-                __FILE__
-            );
-
-            return;
+            if (!list_resize(l, newsize)){
+                return;
+            }
         }
     }
 }
@@ -856,7 +856,7 @@ void list_free(list *l){
     if (!l){
         log_write(
             logger,
-            LOG_WARNING,
+            LOG_DEBUG,
             "[%s] list_free() - list is NULL\n",
             __FILE__
         );

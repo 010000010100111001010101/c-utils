@@ -24,7 +24,7 @@ static size_t write_response_headers(char *data, size_t size, size_t nitems, voi
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] write_response_headers() - string_split_len() failed\n",
+            "[%s] write_response_headers() - string_split_len call failed\n",
             __FILE__
         );
 
@@ -55,7 +55,7 @@ static size_t write_response_headers(char *data, size_t size, size_t nitems, voi
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] write_response_headers() - map_set() failed\n",
+            "[%s] write_response_headers() - map_set call failed\n",
             __FILE__
         );
 
@@ -625,7 +625,7 @@ http_response *http_request(http_client *http, http_method method, const char *p
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] http_request() - set_request_method() failed\n",
+            "[%s] http_request() - set_request_method call failed\n",
             __FILE__
         );
 
@@ -638,7 +638,7 @@ http_response *http_request(http_client *http, http_method method, const char *p
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] http_request() - set_request_url() failed\n",
+            "[%s] http_request() - set_request_url call failed\n",
             __FILE__
         );
 
@@ -653,7 +653,7 @@ http_response *http_request(http_client *http, http_method method, const char *p
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] http_request() - create_request_header_list() failed\n",
+            "[%s] http_request() - create_request_header_list call failed\n",
             __FILE__
         );
 
@@ -666,7 +666,7 @@ http_response *http_request(http_client *http, http_method method, const char *p
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] http_request() - set_request_headers() failed\n",
+            "[%s] http_request() - set_request_headers call failed\n",
             __FILE__
         );
 
@@ -682,7 +682,7 @@ http_response *http_request(http_client *http, http_method method, const char *p
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] http_request() - set_response_data_writer() failed\n",
+            "[%s] http_request() - set_response_data_writer call failed\n",
             __FILE__
         );
 
@@ -698,7 +698,7 @@ http_response *http_request(http_client *http, http_method method, const char *p
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] http_request() - map_init() failed\n",
+            "[%s] http_request() - map_init call failed\n",
             __FILE__
         );
 
@@ -712,7 +712,7 @@ http_response *http_request(http_client *http, http_method method, const char *p
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] http_request() - set_response_header_writer() failed\n",
+            "[%s] http_request() - set_response_header_writer call failed\n",
             __FILE__
         );
 
@@ -749,7 +749,7 @@ http_response *http_request(http_client *http, http_method method, const char *p
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] http_request() - create_response() failed\n",
+            "[%s] http_request() - create_response call failed\n",
             __FILE__
         );
 
@@ -765,7 +765,7 @@ http_response *http_request(http_client *http, http_method method, const char *p
             log_write(
                 logger,
                 LOG_ERROR,
-                "[%s] http_request() - json_tokener_parse() failed\n",
+                "[%s] http_request() - json_tokener_parse call failed\n",
                 __FILE__
             );
         }

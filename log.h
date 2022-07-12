@@ -4,8 +4,12 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#define LOG_DEFAULT_STREAM stderr
+#define LOG_TIMESTAMP_FORMAT "%m/%d/%Y %H:%M:%S"
+#define LOG_TIMESTAMP_LENGTH 32
+
 #ifdef DEBUG
-#define DLOG(...) fprintf(stderr, __VA_ARGS__)
+#define DLOG(...) fprintf(LOG_DEFAULT_STREAM, __VA_ARGS__)
 #else
 #define DLOG(...)
 #endif

@@ -37,7 +37,7 @@ char *string_create(const char *format, ...){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] string_create() - vsnprintf length failed\n",
+            "[%s] string_create() - vsnprintf call failed for length\n",
             __FILE__
         );
 
@@ -50,7 +50,7 @@ char *string_create(const char *format, ...){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] string_create() - malloc string failed\n",
+            "[%s] string_create() - string alloc failed\n",
             __FILE__
         );
 
@@ -67,7 +67,7 @@ char *string_create(const char *format, ...){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] string_create() - vsnprintf string failed\n",
+            "[%s] string_create() - vsnprintf call failed for string\n",
             __FILE__
         );
 
@@ -83,7 +83,7 @@ bool string_copy(const char *input, char *output, size_t outputsize){
     if (!input){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] string_copy() - input is NULL\n",
             __FILE__
         );
@@ -93,7 +93,7 @@ bool string_copy(const char *input, char *output, size_t outputsize){
     else if (!output){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] string_copy() - output is NULL\n",
             __FILE__
         );
@@ -133,7 +133,7 @@ char *string_duplicate(const char *input){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] string_duplicate() - malloc failed\n",
+            "[%s] string_duplicate() - output alloc failed\n",
             __FILE__
         );
 
@@ -151,7 +151,7 @@ list *string_split_len(const char *input, size_t inputlen, const char *delim, lo
     if (!input){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] string_split_len() - input is NULL\n",
             __FILE__
         );
@@ -159,14 +159,7 @@ list *string_split_len(const char *input, size_t inputlen, const char *delim, lo
         return NULL;
     }
     else if (!delim){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] string_split_len() - delim is NULL\n",
-            __FILE__
-        );
-
-        return NULL;
+        delim = " ";
     }
 
     list *tokens = list_init();
@@ -239,7 +232,7 @@ list *string_split(const char *input, const char *delim, long count){
     if (!input){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] string_split() - input is NULL\n",
             __FILE__
         );
@@ -247,14 +240,7 @@ list *string_split(const char *input, const char *delim, long count){
         return NULL;
     }
     else if (!delim){
-        log_write(
-            logger,
-            LOG_ERROR,
-            "[%s] string_split() - delim is NULL\n",
-            __FILE__
-        );
-
-        return NULL;
+        delim = " ";
     }
 
     return string_split_len(input, strlen(input), delim, count);
@@ -264,7 +250,7 @@ char *string_join(const list *input, const char *delim){
     if (!input){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] string_join() - input is NULL\n",
             __FILE__
         );
@@ -272,7 +258,7 @@ char *string_join(const list *input, const char *delim){
         return NULL;
     }
     else if (!delim){
-        delim = "";
+        delim = " ";
     }
 
     size_t delimlen = strlen(delim);
@@ -294,7 +280,7 @@ char *string_join(const list *input, const char *delim){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] string_join() - alloc for output failed\n",
+            "[%s] string_join() - output alloc failed\n",
             __FILE__
         );
 
@@ -327,7 +313,7 @@ char *string_lower(char *input){
     if (!input){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] string_lower() - input is NULL\n",
             __FILE__
         );
@@ -348,7 +334,7 @@ char *string_upper(char *input){
     if (!input){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] string_upper() - input is NULL\n",
             __FILE__
         );
@@ -369,7 +355,7 @@ bool string_from_time(const char *format, char *output, size_t outputsize){
     if (!format){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] string_from_time() - format is NULL\n",
             __FILE__
         );
@@ -379,7 +365,7 @@ bool string_from_time(const char *format, char *output, size_t outputsize){
     else if (!output){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] string_from_time() - output is NULL\n",
             __FILE__
         );
@@ -419,7 +405,7 @@ bool string_to_int(const char *input, int *output, int base){
     if (!input){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] string_to_int() - input is NULL\n",
             __FILE__
         );
@@ -429,7 +415,7 @@ bool string_to_int(const char *input, int *output, int base){
     else if (!output){
         log_write(
             logger,
-            LOG_ERROR,
+            LOG_WARNING,
             "[%s] string_to_int() - output is NULL\n",
             __FILE__
         );

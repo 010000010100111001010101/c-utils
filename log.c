@@ -6,16 +6,12 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-#define LOG_DEFAULT_STREAM stderr
-#define LOG_TIMESTAMP_FORMAT "%m/%d/%Y %H:%M:%S"
-#define LOG_TIMESTAMP_LENGTH 32
-
 logctx *log_init(const char *filename, FILE *stream){
     logctx *log = malloc(sizeof(*log));
 
     if (!log){
         DLOG(
-            "[%s] log_init() - log object alloc failed\n",
+            "[%s] log_init() - log alloc failed\n",
             __FILE__
         );
 
@@ -27,9 +23,10 @@ logctx *log_init(const char *filename, FILE *stream){
 
         if (!log->handle){
             DLOG(
-                "[%s] log_init() - failed to open '%s' in append mode\n",
+                "[%s] log_init() - failed to open '%s' in append mode: %s\n",
                 __FILE__,
-                filename
+                filename,
+                strerror(errno)
             );
 
             free(log);
@@ -50,7 +47,7 @@ logctx *log_init(const char *filename, FILE *stream){
 bool log_write(const logctx *log, logtype type, const char *format, ...){
     if (!format){
         DLOG(
-            "[%s] log_write() - format string is NULL\n",
+            "[%s] log_write() - format is NULL\n",
             __FILE__
         );
 
@@ -67,8 +64,9 @@ bool log_write(const logctx *log, logtype type, const char *format, ...){
 
     if (!string_from_time(LOG_TIMESTAMP_FORMAT, timestamp, sizeof(timestamp))){
         DLOG(
-            "[%s] log_write() - failed to get timestamp string\n",
-            __FILE__
+            "[%s] log_write() - failed to get timestamp string: %s\n",
+            __FILE__,
+            strerror(errno)
         );
     }
 
@@ -110,18 +108,12 @@ bool log_write(const logctx *log, logtype type, const char *format, ...){
 
     if (err < 0){
         DLOG(
-            "[%s] log_write() - vfprintf() failed\n",
+            "[%s] log_write() - vfprintf call failed\n",
             __FILE__
         );
 
         return false;
     }
-
-    /*
-    if (type == LOG_ERROR){
-        print errno?
-    }
-    */
 
     return true;
 }
@@ -137,39 +129,8 @@ void log_free(logctx *log){
     }
 
     if (log->file){
-        int err = fclose(log->handle);
-
-        switch (err){
-        case EBADF:
-            DLOG(
-                "[%s] log_free() - handle is not active\n",
-                __FILE__
-            );
-
-            break;
-        case EINTR:
-            DLOG(
-                "[%s] log_free() - handle was interrupted\n",
-                __FILE__
-            );
-
-            break;
-        case EIO:
-            DLOG(
-                "[%s] log_free() - handle encountered I/O error\n",
-                __FILE__
-            );
-
-            break;
-        case 0:
-            break;
-        default:
-            DLOG(
-                "[%s] log_free() - unknown error: '%d'\n",
-                __FILE__,
-                err
-            );
-        }
+        fflush(log->handle);
+        fclose(log->handle);
     }
 
     free(log);
