@@ -85,11 +85,9 @@ list *json_array_to_list(json_object *value){
             item.data_copy = &tmp;
         }
         else if (type == json_type_null){
-            void *tmp = NULL;
-
             item.type = L_TYPE_NULL;
-            item.size = sizeof(*tmp);
-            item.data_copy = tmp;
+            item.size = 0;
+            item.data = NULL;
         }
         else if (type == json_type_object){
             map *tmp = json_to_map(itemobj);

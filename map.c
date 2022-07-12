@@ -61,6 +61,8 @@ static bool check_availability(map *m){
             return false;
         }
     }
+
+    return true;
 }
 
 static map_item *item_init_pointer(mtype type, size_t size, void *data, map_generic_free generic_free){
@@ -984,12 +986,12 @@ bool map_set(map *m, const map_item *key, const map_item *value){
     else if (key->data){
         log_write(
             logger,
-            LOG_DEBUG,
+            LOG_WARNING,
             "[%s] map_set() - key will *always* be copied -- set key in data_copy instead\n",
             __FILE__
         );
 
-        key->data_copy = key->data;
+        return false;
     }
 
     if (!check_availability(m)){
