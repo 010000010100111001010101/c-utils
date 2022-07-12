@@ -1184,7 +1184,15 @@ void map_free(map *m){
     }
 
     for (size_t index = 0; index < m->size; ++index){
-        node_free(m->nodes[index]);
+        node *n = m->nodes[index];
+
+        if (!n){
+            /* skip empty index */
+
+            continue;
+        }
+
+        node_free(n);
     }
 
     free(m->nodes);
