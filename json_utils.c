@@ -453,3 +453,33 @@ json_object *map_to_json(const map *m){
 
     return json;
 }
+
+json_object *json_merge_objects(json_object *oldobj, json_object *newobj){
+    if (!oldobj || !newobj){
+        log_write(
+            logger,
+            LOG_WARNING,
+            "[%s] json_merge_objects() - objects are NULL\n",
+            __FILE__
+        );
+
+        return NULL;
+    }
+
+    json_object *output = json_object_get(oldobj);
+
+    if (!output){
+        log_write(
+            logger,
+            LOG_ERROR,
+            "[%s] json_merge_objects() - output object initialization failed\n",
+            __FILE__
+        );
+
+        return NULL;
+    }
+
+    /* iterate b and insert into output */
+
+    return output;
+}

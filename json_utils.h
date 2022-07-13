@@ -12,4 +12,6 @@ json_object *list_to_json_array(const list *);
 map *json_to_map(json_object *);
 json_object *map_to_json(const map *);
 
+json_object *json_merge_objects(json_object *, json_object *);
+
 #endif
