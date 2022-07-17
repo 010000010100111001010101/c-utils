@@ -490,6 +490,16 @@ int64_t list_get_int(const list *l, size_t pos){
     return *(int64_t *)i->data;
 }
 
+uint64_t list_get_uint(const list *l, size_t pos){
+    const list_item *i = get_item(l, pos, L_TYPE_UINT);
+
+    if (!i){
+        return 0;
+    }
+
+    return *(uint64_t *)i->data;
+}
+
 size_t list_get_size_t(const list *l, size_t pos){
     const list_item *i = get_item(l, pos, L_TYPE_SIZE_T);
 

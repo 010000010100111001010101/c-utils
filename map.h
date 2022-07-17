@@ -16,6 +16,7 @@ typedef enum {
     M_TYPE_DOUBLE,
     M_TYPE_GENERIC,
     M_TYPE_INT,
+    M_TYPE_UINT,
     M_TYPE_LIST,
     M_TYPE_MAP,
     M_TYPE_NULL,
@@ -74,6 +75,7 @@ bool map_get_bool(const map *, size_t, const void *);
 char map_get_char(const map *, size_t, const void *);
 double map_get_double(const map *, size_t, const void *);
 int64_t map_get_int(const map *, size_t, const void *);
+uint64_t map_get_uint(const map *, size_t, const void *);
 size_t map_get_size_t(const map *, size_t, const void *);
 
 /* ------------------ WARNING ------------------

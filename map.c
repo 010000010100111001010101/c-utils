@@ -909,6 +909,16 @@ int64_t map_get_int(const map *m, size_t size, const void *key){
     return *(int64_t *)n->value->data;
 }
 
+uint64_t map_get_uint(const map *m, size_t size, const void *key){
+    const node *n = get_node(m, size, key, M_TYPE_UINT);
+
+    if (!n){
+        return -1;
+    }
+
+    return *(uint64_t *)n->value->data;
+}
+
 size_t map_get_size_t(const map *m, size_t size, const void *key){
     const node *n = get_node(m, size, key, M_TYPE_SIZE_T);
 

@@ -15,6 +15,7 @@ typedef enum {
     L_TYPE_DOUBLE,
     L_TYPE_GENERIC,
     L_TYPE_INT,
+    L_TYPE_UINT,
     L_TYPE_LIST,
     L_TYPE_MAP,
     L_TYPE_NULL,
@@ -56,6 +57,7 @@ bool list_get_bool(const list *, size_t);
 char list_get_char(const list *, size_t);
 double list_get_double(const list *, size_t);
 int64_t list_get_int(const list *, size_t);
+uint64_t list_get_uint(const list *, size_t);
 size_t list_get_size_t(const list *, size_t);
 
 /* ------------------ WARNING ------------------
