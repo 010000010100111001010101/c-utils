@@ -1,5 +1,5 @@
 PROG = cutils
-SRCS = $(wildcard src/*.c) hashers/spooky.c
+SRCS = $(wildcard *.c) hashers/spooky.c
 OBJS = $(SRCS:.c=.o)
 IGNORE = -Wno-implicit-fallthrough -Wno-pointer-to-int-cast
 DEBUGFLAGS = -Og -ggdb -DDEBUG -fsanitize=address
