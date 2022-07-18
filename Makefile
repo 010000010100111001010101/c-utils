@@ -6,9 +6,9 @@ IGNORE = -Wno-implicit-fallthrough -Wno-pointer-to-int-cast
 DEBUGFLAGS = -Og -ggdb -DDEBUG -fsanitize=address
 
 CFLAGS = -std=c18 -pedantic -Wall -Wextra -Werror $(IGNORE) $(DEBUGFLAGS)
-INCLUDES = -I/usr/local/include -I/usr/include
+INCLUDES = -I/usr/local/include -I/usr/include -I./include -I./include/c-utils
 
-LDFLAGS = -L/usr/local/lib -L/usr/lib
+LDFLAGS = -L/usr/local/lib -L/usr/lib -L.
 LDLIBS = -lpthread -lcurl -ljson-c -lwebsockets -lsqlite3
 
 .c.o:
@@ -17,6 +17,9 @@ LDLIBS = -lpthread -lcurl -ljson-c -lwebsockets -lsqlite3
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $(PROG) $(OBJS) $(LDFLAGS) $(LDLIBS)
 
+lib$(PROG).so: $(OBJS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o lib$(PROG).so -fPIC $(SRCS) $(LDFLAGS) -shared $(LDLIBS) 
+
 .PHONY: clean
 clean:
-	rm -rf $(PROG) $(OBJS) *.o *.core vgcore.*
+	rm -rf $(PROG) $(OBJS) *.o *.so *.core vgcore.*
