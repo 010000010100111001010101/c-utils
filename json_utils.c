@@ -208,6 +208,7 @@ json_object *list_to_json_array(const list *l){
 
             break;
         case L_TYPE_INT:
+        case L_TYPE_UINT:
             obj = json_object_new_int64(list_get_int(l, index));
 
             break;
@@ -236,7 +237,7 @@ json_object *list_to_json_array(const list *l){
             log_write(
                 logger,
                 LOG_WARNING,
-                "[%s] list_to_json_array() - unexpected list type at index %ld\n",
+                "[%s] list_to_json_array() - unsupported list type at index %ld\n",
                 __FILE__,
                 index
             );

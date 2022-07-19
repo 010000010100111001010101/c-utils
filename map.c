@@ -35,7 +35,10 @@ static uint32_t generate_hash(uint32_t seed, size_t size, const void *data){
 }
 
 static size_t generate_index(uint32_t seed, size_t size){
-    return (LCG_MULTIPLIER * seed + LCG_INCREMENT) & (size - 1);
+    size_t multiplier = LCG_MULTIPLIER;
+    size_t increment = LCG_INCREMENT;
+
+    return (multiplier * seed + increment) & (size - 1);
 }
 
 static bool check_availability(map *m){
@@ -573,19 +576,19 @@ bool map_resize(map *m, size_t size){
             continue;
         }
 
-        size_t index = generate_index(n->hash, size);
-        node *hold = nodes[index];
+        size_t newindex = generate_index(n->hash, size);
+        node *hold = nodes[newindex];
 
         for (size_t count = 0; count < size; ++count){
             if (!hold){
                 break;
             }
 
-            index = generate_index(index, size);
-            hold = nodes[index];
+            newindex = generate_index(newindex, size);
+            hold = nodes[newindex];
         }
 
-        nodes[index] = n;
+        nodes[newindex] = n;
     }
 
     free(m->nodes);

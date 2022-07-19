@@ -1,10 +1,17 @@
 PROG = cutils
 SRCS = $(wildcard *.c) hashers/spooky.c
 OBJS = $(SRCS:.c=.o)
-IGNORE = -Wno-implicit-fallthrough -Wno-pointer-to-int-cast
-DEBUGFLAGS = -Og -ggdb -DDEBUG -fsanitize=address
 
-CFLAGS = -std=c18 -pedantic -Wall -Wextra -Werror $(IGNORE) $(DEBUGFLAGS)
+EXTRAS = -Wshadow -Wundef -Wpointer-arith -Wfloat-equal -Wcast-align \
+         -Wstrict-prototypes -Wwrite-strings -Waggregate-return \
+         -Wswitch-default -Wunreachable-code -Wformat=2
+
+IGNORE = -Wno-implicit-fallthrough -Wno-pointer-to-int-cast \
+         -Wno-format-nonliteral
+
+DEBUGFLAGS = -Og -ggdb -DDEBUG -fsanitize=address,undefined
+
+CFLAGS = -std=c18 -pedantic -Wall -Wextra -Werror $(EXTRAS) $(IGNORE) $(DEBUGFLAGS)
 INCLUDES = -I/usr/local/include -I/usr/include
 
 LDFLAGS = -L/usr/local/lib -L/usr/lib -L.
