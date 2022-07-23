@@ -58,7 +58,7 @@ static bool append_rows_named(sqlite3 *db, sqlite3_stmt *stmt, list *res){
                 v.data_copy = &value;
             }
             else if (ctype == SQLITE_INTEGER){
-                int value = sqlite3_column_int(stmt, index);
+                int64_t value = sqlite3_column_int64(stmt, index);
 
                 v.type = M_TYPE_INT;
                 v.size = sizeof(value);
@@ -161,7 +161,7 @@ static bool append_rows(sqlite3 *db, sqlite3_stmt *stmt, list *res){
                 item.data_copy = &value;
             }
             else if (ctype == SQLITE_INTEGER){
-                int value = sqlite3_column_int(stmt, index);
+                int64_t value = sqlite3_column_int64(stmt, index);
 
                 item.type = L_TYPE_INT;
                 item.size = sizeof(value);
@@ -220,22 +220,37 @@ static bool append_rows(sqlite3 *db, sqlite3_stmt *stmt, list *res){
 }
 
 sqlite3 *database_init(const char *path){
-    if (!path){
-        path = ":memory:";
+    sqlite3 *db = NULL;
+
+    int err = 0;
+
+    if (path){
+        err = sqlite3_open_v2(
+            path,
+            &db,
+            SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE,
+            NULL
+        );
+    }
+    else {
+        err = sqlite3_open_v2(
+            path,
+            &db,
+            SQLITE_OPEN_MEMORY,
+            NULL
+        );
     }
 
-    sqlite3 *db;
-
-    if (sqlite3_open(path, &db) != SQLITE_OK){
+    if (err != SQLITE_OK){
         log_write(
             logger,
             LOG_ERROR,
-            "[%s] database_init() - sqlite3_open call failed: %s\n",
+            "[%s] database_init() - sqlite3_open_v2 call failed: %s\n",
             __FILE__,
             sqlite3_errmsg(db)
         );
 
-        sqlite3_close(db);
+        database_free(db);
 
         return NULL;
     }
@@ -314,7 +329,7 @@ bool database_execute(sqlite3 *db, const char *sql, const list *params, list **r
 
                     break;
                 case L_TYPE_INT:
-                    err = sqlite3_bind_int(
+                    err = sqlite3_bind_int64(
                         stmt,
                         index + 1,
                         list_get_int(params, index)
@@ -339,7 +354,7 @@ bool database_execute(sqlite3 *db, const char *sql, const list *params, list **r
                     log_write(
                         logger,
                         LOG_WARNING,
-                        "[%s] database_execute() - unknown node type %d\n",
+                        "[%s] database_execute() - unhandled node type %d\n",
                         __FILE__,
                         type
                     );
@@ -430,5 +445,5 @@ void database_free(sqlite3 *db){
         return;
     }
 
-    sqlite3_close(db);
+    sqlite3_close_v2(db);
 }
