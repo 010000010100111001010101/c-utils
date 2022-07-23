@@ -857,6 +857,17 @@ void list_remove(list *l, size_t pos){
 }
 
 void list_empty(list *l){
+    if (!l){
+        log_write(
+            logger,
+            LOG_WARNING,
+            "[%s] list_empty() - list is NULL\n",
+            __FILE__
+        );
+
+        return;
+    }
+
     for (size_t index = 0; index < l->length; ++index){
         list_remove(l, index);
     }
