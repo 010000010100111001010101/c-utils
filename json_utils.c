@@ -483,14 +483,28 @@ bool json_merge_objects(json_object *from, json_object *into){
     while (!json_object_iter_equal(&curr, &end)){
         const char *key = json_object_iter_peek_name(&curr);
         json_object *valueobj = json_object_iter_peek_value(&curr);
+        json_object *copyobj = NULL;
 
-        if (json_object_object_add(into, key, valueobj)){
+        if (json_object_deep_copy(valueobj, &copyobj, NULL)){
+            log_write(
+                logger,
+                LOG_ERROR,
+                "[%s] json_merge_objects() - json_object_deep_copy call failed\n",
+                __FILE__
+            );
+
+            return false;
+        }
+
+        if (json_object_object_add(into, key, copyobj)){
             log_write(
                 logger,
                 LOG_ERROR,
                 "[%s] json_merge_objects() - json_object_object_add call failed\n",
                 __FILE__
             );
+
+            json_object_put(copyobj);
 
             return false;
         }
