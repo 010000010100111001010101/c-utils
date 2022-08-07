@@ -62,7 +62,7 @@ bool log_write(const logctx *log, logtype type, const char *format, ...){
 
     char timestamp[LOG_TIMESTAMP_LENGTH];
 
-    if (!string_from_time(LOG_TIMESTAMP_FORMAT, timestamp, sizeof(timestamp))){
+    if (!string_from_time(0, true, LOG_TIMESTAMP_FORMAT, timestamp, sizeof(timestamp))){
         DLOG(
             "[%s] log_write() - failed to get timestamp string: %s\n",
             __FILE__,

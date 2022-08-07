@@ -351,7 +351,7 @@ char *string_upper(char *input){
     return input;
 }
 
-bool string_from_time(const char *format, char *output, size_t outputsize){
+bool string_from_time(time_t timet, bool local, const char *format, char *output, size_t outputsize){
     if (!format){
         log_write(
             logger,
@@ -373,8 +373,11 @@ bool string_from_time(const char *format, char *output, size_t outputsize){
         return false;
     }
 
-    time_t timet = time(NULL);
-    struct tm *timetm = localtime(&timet);
+    if (timet == 0){
+        timet = time(NULL);
+    }
+
+    struct tm *timetm = local ? localtime(&timet) : gmtime(&timet);
 
     if (!timetm){
         log_write(

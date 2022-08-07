@@ -19,7 +19,7 @@ char *string_join(const list *, const char *);
 char *string_lower(char *);
 char *string_upper(char *);
 
-bool string_from_time(const char *, char *, size_t);
+bool string_from_time(time_t, bool, const char *, char *, size_t);
 
 bool string_to_int(const char *, int *, int);
 
